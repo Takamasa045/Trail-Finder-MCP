@@ -1,9 +1,7 @@
-# Trail‑Finder MCP (HTTP)
+# Trail‑Finder MCP
 
-オープンデータを横断して **登山口/道標/水場**・**徒歩ルート**・**標高**・**天気** を返す HTTP MCP サーバー（ツール実装）。  
-MVPは **OSRM**（徒歩ルーティング）/ **Overpass**（OSM POI）/ **Open‑Elevation or OpenTopoData**（標高）/ **Open‑Meteo**（天気）。
-
-> 参考：コードは単体で http サーバーとして起動し、`/tools/*` エンドポイントをツールとして叩けます。MCP/Skills 側では HTTP ツールとして登録してください。
+オープンデータを横断して **登山口/道標/水場**・**徒歩ルート**・**標高**・**天気** を返す MCP サーバーです。  
+HTTP ツールとしての利用に加えて、Claude Code / Claude Desktop などの MCP クライアントから直接呼び出せる **stdio MCP サーバー** モードを提供します。
 
 ---
 
@@ -21,11 +19,21 @@ DEFAULT_TZ=Asia/Tokyo
 PORT=8080
 ```
 
-### 2) 実行
+### 2) 実行モード
+
+#### HTTP モード（デフォルト）
 ```bash
-go run ./cmd/trail-finder-mcp
+go run ./cmd/trail-finder-mcp --mode http
 # or
-PORT=8080 go run ./cmd/trail-finder-mcp
+PORT=8080 go run ./cmd/trail-finder-mcp --mode http
+```
+
+#### MCP (stdio) モード
+Claude Code / Claude Desktop から直接呼び出す場合はこちらを使用します。
+```bash
+go run ./cmd/trail-finder-mcp --mode mcp
+# 環境変数で指定する場合
+TRAILFINDER_MODE=mcp go run ./cmd/trail-finder-mcp
 ```
 
 ### 3) 動作確認（例）
@@ -87,7 +95,7 @@ curl -s http://localhost:8080/tools/forecast -H 'Content-Type: application/json'
 
 ---
 
-## 🧩 MCP/Skills 側登録ヒント（例）
+## 🧩 HTTP ツール登録例（MCP/Skills 等）
 ```jsonc
 {
   "tools": [ {
@@ -113,6 +121,40 @@ curl -s http://localhost:8080/tools/forecast -H 'Content-Type: application/json'
   } ]
 }
 ```
+
+---
+
+## 🤝 Claude Code / Claude Desktop 連携手順
+
+1. バイナリをビルド（任意）
+   ```bash
+   go build -o trail-finder-mcp ./cmd/trail-finder-mcp
+   ```
+
+2. Claude Desktop の設定ファイル（例: macOS は `~/Library/Application Support/Claude/claude_desktop_config.json`）に MCP サーバーを追加します。
+   ```jsonc
+   {
+     "mcpServers": {
+       "trail-finder": {
+         "command": "/absolute/path/to/trail-finder-mcp",
+         "args": ["--mode", "mcp"],
+         "env": {
+           "TRAILFINDER_OVERPASS_URL": "https://overpass-api.de/api/interpreter",
+           "OSRM_URL": "https://router.project-osrm.org",
+           "OPENMETEO_URL": "https://api.open-meteo.com/v1/forecast",
+           "DEFAULT_TZ": "Asia/Tokyo"
+         }
+       }
+     }
+   }
+   ```
+   - `command` はビルド済みバイナリ、または `go run` をラップしたシェルスクリプトでも構いません。
+   - `args` を省略する場合は `TRAILFINDER_MODE=mcp` を環境変数として設定してください。
+
+3. Claude Code / Claude Desktop を再起動すると「trail-finder」 MCP サーバーがツール一覧に表示され、`trailheads`, `route_foot`, `elevation`, `forecast` の 4 ツールが利用可能になります。
+
+> Windows の設定ファイル例: `%APPDATA%\\Claude\\claude_desktop_config.json`  
+> Linux の設定ファイル例: `~/.config/Claude/claude_desktop_config.json`
 
 ---
 
