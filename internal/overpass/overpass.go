@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -14,14 +15,14 @@ import (
 	"trail-finder-mcp/internal/models"
 )
 
-var httpClient = &http.Client{ Timeout: 20 * time.Second }
+var httpClient = &http.Client{Timeout: 20 * time.Second}
 
 type overpassResponse struct {
 	Elements []struct {
-		Type string `json:"type"` // "node"
-		ID   int64  `json:"id"`
-		Lat  float64 `json:"lat"`
-		Lon  float64 `json:"lon"`
+		Type string            `json:"type"` // "node"
+		ID   int64             `json:"id"`
+		Lat  float64           `json:"lat"`
+		Lon  float64           `json:"lon"`
 		Tags map[string]string `json:"tags"`
 	} `json:"elements"`
 }
@@ -49,6 +50,10 @@ func QueryPOIs(ctx context.Context, in models.TrailheadsInput) (*models.Trailhea
 		parts = append(parts, fmt.Sprintf("node(around:%d,%.7f,%.7f)[natural=spring];", in.RadiusM, in.Lat, in.Lon))
 	}
 
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("no query generated for include set")
+	}
+
 	query := fmt.Sprintf(`[out:json][timeout:25];(%s);out tags geom;`, joinParts(parts))
 	reqBody := bytes.NewBufferString(query)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, reqBody)
@@ -73,33 +78,31 @@ func QueryPOIs(ctx context.Context, in models.TrailheadsInput) (*models.Trailhea
 	}
 
 	resp := &models.TrailheadsResponse{
-		Center: models.Coord{Lat: in.Lat, Lon: in.Lon},
-		RadiusM: in.RadiusM,
-		Items: make([]models.POIItem, 0, len(op.Elements)),
+		Center:      models.Coord{Lat: in.Lat, Lon: in.Lon},
+		RadiusM:     in.RadiusM,
+		Items:       make([]models.POIItem, 0, len(op.Elements)),
 		Attribution: "© OpenStreetMap contributors (ODbL) via Overpass API",
 	}
 	for _, el := range op.Elements {
 		p := models.POIItem{
-			ID: fmt.Sprintf("%s/%d", el.Type, el.ID),
-			Type: classify(el.Tags),
-			Tags: el.Tags,
-			Location: models.Coord{Lat: el.Lat, Lon: el.Lon},
-			Source: "overpass/osm",
+			ID:        fmt.Sprintf("%s/%d", el.Type, el.ID),
+			Type:      classify(el.Tags),
+			Tags:      el.Tags,
+			Location:  models.Coord{Lat: el.Lat, Lon: el.Lon},
+			Source:    "overpass/osm",
+			DistanceM: distanceMeters(in.Lat, in.Lon, el.Lat, el.Lon),
 		}
 		if name, ok := el.Tags["name"]; ok {
 			p.Name = name
 		}
 		resp.Items = append(resp.Items, p)
 	}
-	// Optional: trim and sort by rough distance
-	if len(resp.Items) > in.Limit {
-		resp.Items = resp.Items[:in.Limit]
-	}
 	sort.Slice(resp.Items, func(i, j int) bool {
-		di := abs(resp.Items[i].Location.Lat - in.Lat) + abs(resp.Items[i].Location.Lon - in.Lon)
-		dj := abs(resp.Items[j].Location.Lat - in.Lat) + abs(resp.Items[j].Location.Lon - in.Lon)
-		return di < dj
+		return resp.Items[i].DistanceM < resp.Items[j].DistanceM
 	})
+	if limit := in.Limit; limit > 0 && len(resp.Items) > limit {
+		resp.Items = resp.Items[:limit]
+	}
 	return resp, nil
 }
 
@@ -133,9 +136,16 @@ func joinParts(parts []string) string {
 	return b.String()
 }
 
-func abs(f float64) float64 {
-	if f < 0 {
-		return -f
-	}
-	return f
+func distanceMeters(lat1, lon1, lat2, lon2 float64) float64 {
+	const earthRadius = 6371000.0 // meters
+	dLat := toRadians(lat2 - lat1)
+	dLon := toRadians(lon2 - lon1)
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(toRadians(lat1))*math.Cos(toRadians(lat2))*math.Sin(dLon/2)*math.Sin(dLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return earthRadius * c
+}
+
+func toRadians(v float64) float64 {
+	return v * math.Pi / 180
 }

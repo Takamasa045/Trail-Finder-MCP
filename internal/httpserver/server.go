@@ -2,14 +2,18 @@ package httpserver
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 
+	"trail-finder-mcp/internal/elevation"
 	"trail-finder-mcp/internal/models"
 	"trail-finder-mcp/internal/overpass"
 	"trail-finder-mcp/internal/router"
-	"trail-finder-mcp/internal/elevation"
 	"trail-finder-mcp/internal/weather"
 )
+
+const maxRequestBodyBytes int64 = 1 << 20
 
 func New() *http.ServeMux {
 	mux := http.NewServeMux()
@@ -36,13 +40,40 @@ func badRequest(w http.ResponseWriter, msg string) {
 	})
 }
 
+func methodNotAllowed(w http.ResponseWriter, allowed string) {
+	w.Header().Set("Allow", allowed)
+	writeJSON(w, http.StatusMethodNotAllowed, models.ErrorResponse{
+		Error: models.ErrorBody{
+			Code:      "METHOD_NOT_ALLOWED",
+			Message:   "only " + allowed + " is supported on this endpoint",
+			Retryable: false,
+		},
+	})
+}
+
+func decodeJSONBody(body io.Reader, dst any) error {
+	dec := json.NewDecoder(io.LimitReader(body, maxRequestBodyBytes))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return errors.New("request body must contain a single JSON object")
+		}
+		return err
+	}
+	return nil
+}
+
 func handleTrailheads(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		methodNotAllowed(w, http.MethodPost)
 		return
 	}
+	defer r.Body.Close()
 	var in models.TrailheadsInput
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+	if err := decodeJSONBody(r.Body, &in); err != nil {
 		badRequest(w, "invalid json: "+err.Error())
 		return
 	}
@@ -62,11 +93,12 @@ func handleTrailheads(w http.ResponseWriter, r *http.Request) {
 
 func handleRouteFoot(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		methodNotAllowed(w, http.MethodPost)
 		return
 	}
+	defer r.Body.Close()
 	var in models.RouteInput
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+	if err := decodeJSONBody(r.Body, &in); err != nil {
 		badRequest(w, "invalid json: "+err.Error())
 		return
 	}
@@ -86,11 +118,12 @@ func handleRouteFoot(w http.ResponseWriter, r *http.Request) {
 
 func handleElevation(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		methodNotAllowed(w, http.MethodPost)
 		return
 	}
+	defer r.Body.Close()
 	var in models.ElevationInput
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+	if err := decodeJSONBody(r.Body, &in); err != nil {
 		badRequest(w, "invalid json: "+err.Error())
 		return
 	}
@@ -110,11 +143,12 @@ func handleElevation(w http.ResponseWriter, r *http.Request) {
 
 func handleForecast(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		methodNotAllowed(w, http.MethodPost)
 		return
 	}
+	defer r.Body.Close()
 	var in models.ForecastInput
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+	if err := decodeJSONBody(r.Body, &in); err != nil {
 		badRequest(w, "invalid json: "+err.Error())
 		return
 	}

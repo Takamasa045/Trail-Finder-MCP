@@ -13,7 +13,7 @@ import (
 	"trail-finder-mcp/internal/models"
 )
 
-var httpClient = &http.Client{ Timeout: 15 * time.Second }
+var httpClient = &http.Client{Timeout: 15 * time.Second}
 
 func Lookup(ctx context.Context, in models.ElevationInput) (*models.ElevationResponse, error) {
 	provider := os.Getenv("ELEVATION_PROVIDER")
@@ -21,7 +21,7 @@ func Lookup(ctx context.Context, in models.ElevationInput) (*models.ElevationRes
 		provider = "open-elevation"
 	}
 	switch provider {
-	case "open-topo", "open-topodata", "opentopo", "open-topodata":
+	case "open-topo", "open-topodata", "opentopo", "opentopodata":
 		return openTopo(ctx, in)
 	default:
 		return openElevation(ctx, in)
