@@ -62,30 +62,30 @@ func NewServer() *mcp.Server {
 }
 
 type trailheadsArgs struct {
-	Lat       float64  `json:"lat" jsonschema:"description=Latitude in decimal degrees"`
-	Lon       float64  `json:"lon" jsonschema:"description=Longitude in decimal degrees"`
-	RadiusM   int      `json:"radius_m,omitempty" jsonschema:"description=Search radius in meters (default 2000)"`
-	Include   []string `json:"include,omitempty" jsonschema:"description=Optional OSM categories to include (guidepost, trailhead)"`
-	AlsoWater bool     `json:"also_water,omitempty" jsonschema:"description=Include nearby water sources (drinking water, springs)"`
-	Limit     int      `json:"limit,omitempty" jsonschema:"description=Maximum number of POIs to return"`
+	Lat       float64  `json:"lat" description:"Latitude in decimal degrees"`
+	Lon       float64  `json:"lon" description:"Longitude in decimal degrees"`
+	RadiusM   int      `json:"radius_m,omitempty" description:"Search radius in meters (default 2000)"`
+	Include   []string `json:"include,omitempty" description:"Optional OSM categories to include (guidepost, trailhead)"`
+	AlsoWater bool     `json:"also_water,omitempty" description:"Include nearby water sources (drinking water, springs)"`
+	Limit     int      `json:"limit,omitempty" description:"Maximum number of POIs to return"`
 }
 
 type routeArgs struct {
-	From    models.Coord   `json:"from" jsonschema:"description=Starting location (lat/lon)"`
-	To      models.Coord   `json:"to" jsonschema:"description=Destination location (lat/lon)"`
-	Engine  string         `json:"engine,omitempty" jsonschema:"description=Routing engine (auto, osrm, valhalla)"`
-	Options map[string]any `json:"options,omitempty" jsonschema:"description=Optional routing flags (e.g. include_geometry)"`
+	From    models.Coord   `json:"from" description:"Starting location (lat/lon)"`
+	To      models.Coord   `json:"to" description:"Destination location (lat/lon)"`
+	Engine  string         `json:"engine,omitempty" description:"Routing engine (auto, osrm, valhalla)"`
+	Options map[string]any `json:"options,omitempty" description:"Optional routing flags (e.g. include_geometry)"`
 }
 
 type elevationArgs struct {
-	Lat float64 `json:"lat" jsonschema:"description=Latitude in decimal degrees"`
-	Lon float64 `json:"lon" jsonschema:"description=Longitude in decimal degrees"`
+	Lat float64 `json:"lat" description:"Latitude in decimal degrees"`
+	Lon float64 `json:"lon" description:"Longitude in decimal degrees"`
 }
 
 type forecastArgs struct {
-	Lat   float64 `json:"lat" jsonschema:"description=Latitude in decimal degrees"`
-	Lon   float64 `json:"lon" jsonschema:"description=Longitude in decimal degrees"`
-	Hours int     `json:"hours,omitempty" jsonschema:"description=Number of forecast hours (default 24, max 168)"`
+	Lat   float64 `json:"lat" description:"Latitude in decimal degrees"`
+	Lon   float64 `json:"lon" description:"Longitude in decimal degrees"`
+	Hours int     `json:"hours,omitempty" description:"Number of forecast hours (default 24, max 168)"`
 }
 
 func handleTrailheads(ctx context.Context, _ *mcp.CallToolRequest, args trailheadsArgs) (*mcp.CallToolResult, models.TrailheadsResponse, error) {

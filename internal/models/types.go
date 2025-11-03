@@ -63,8 +63,8 @@ type TrailheadsResponse struct {
 }
 
 type Coord struct {
-	Lat float64 `json:"lat"`
-	Lon float64 `json:"lon"`
+	Lat float64 `json:"lat" description:"Latitude in decimal degrees"`
+	Lon float64 `json:"lon" description:"Longitude in decimal degrees"`
 }
 
 // ---- Route ----
