@@ -3,10 +3,10 @@ package mcpserver
 import (
 	"context"
 	"errors"
-	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"trail-finder-mcp/internal/config"
 	"trail-finder-mcp/internal/elevation"
 	"trail-finder-mcp/internal/models"
 	"trail-finder-mcp/internal/overpass"
@@ -16,7 +16,6 @@ import (
 
 const (
 	serverName     = "trail-finder-mcp"
-	defaultVersion = "0.1.0"
 )
 
 // Run starts the MCP server on stdio. This is the entry point used by Claude Code
@@ -28,14 +27,9 @@ func Run(ctx context.Context) error {
 
 // NewServer instantiates an MCP server with all available Trail-Finder tools registered.
 func NewServer() *mcp.Server {
-	version := os.Getenv("TRAILFINDER_VERSION")
-	if version == "" {
-		version = defaultVersion
-	}
-
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    serverName,
-		Version: version,
+		Version: config.Version(),
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{

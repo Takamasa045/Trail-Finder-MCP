@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
+	"trail-finder-mcp/internal/config"
 	"trail-finder-mcp/internal/models"
 )
 
-var httpClient = &http.Client{ Timeout: 20 * time.Second }
+var httpClient = &http.Client{Timeout: 20 * time.Second}
 
 func RouteFoot(ctx context.Context, in models.RouteInput) (*models.RouteResponse, error) {
 	engine := "osrm"
@@ -38,9 +40,10 @@ type osrmResponse struct {
 		Distance float64 `json:"distance"`
 		Duration float64 `json:"duration"`
 		Geometry struct {
-			Type        string        `json:"type"`
-			Coordinates [][]float64   `json:"coordinates"`
+			Type        string      `json:"type"`
+			Coordinates [][]float64 `json:"coordinates"`
 		} `json:"geometry"`
+		Legs []osrmLeg `json:"legs"`
 	} `json:"routes"`
 }
 
@@ -49,18 +52,33 @@ func routeOSRM(ctx context.Context, in models.RouteInput) (*models.RouteResponse
 	if base == "" {
 		base = "https://router.project-osrm.org"
 	}
+
+	includeGeometry := optionBool(in.Options, "include_geometry", true)
+	includeSteps := optionBool(in.Options, "include_steps", false)
+	avoidFerry := optionBool(in.Options, "avoid_ferry", false)
+
 	coords := fmt.Sprintf("%f,%f;%f,%f", in.From.Lon, in.From.Lat, in.To.Lon, in.To.Lat)
 	q := url.Values{}
 	q.Set("alternatives", "false")
-	q.Set("overview", "full")
-	q.Set("geometries", "geojson")
+	if includeGeometry {
+		q.Set("overview", "full")
+		q.Set("geometries", "geojson")
+	} else {
+		q.Set("overview", "false")
+	}
+	if includeSteps {
+		q.Set("steps", "true")
+	}
+	if avoidFerry {
+		q.Set("exclude", "ferry")
+	}
 	endpoint := fmt.Sprintf("%s/route/v1/foot/%s?%s", base, coords, q.Encode())
 
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "trail-finder-mcp/0.1")
+	req.Header.Set("User-Agent", config.UserAgent())
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -80,13 +98,56 @@ func routeOSRM(ctx context.Context, in models.RouteInput) (*models.RouteResponse
 		return nil, fmt.Errorf("osrm route not found")
 	}
 	r := out.Routes[0]
-	return &models.RouteResponse{
+
+	resp := &models.RouteResponse{
 		Engine:    "osrm",
 		DistanceM: r.Distance,
 		DurationS: r.Duration,
-		Geometry: models.GeoJSONLineString{
+	}
+	if includeGeometry {
+		resp.Geometry = models.GeoJSONLineString{
 			Type:        r.Geometry.Type,
 			Coordinates: r.Geometry.Coordinates,
-		},
-	}, nil
+		}
+	}
+	if includeSteps {
+		resp.Steps = collectSteps(r.Legs)
+	}
+	return resp, nil
+}
+
+func optionBool(options map[string]any, key string, defaultVal bool) bool {
+	if options == nil {
+		return defaultVal
+	}
+	raw, ok := options[key]
+	if !ok {
+		return defaultVal
+	}
+	switch v := raw.(type) {
+	case bool:
+		return v
+	case string:
+		b, err := strconv.ParseBool(v)
+		if err == nil {
+			return b
+		}
+	case float64:
+		return v != 0
+	}
+	return defaultVal
+}
+
+type osrmLeg struct {
+	Steps []map[string]any `json:"steps"`
+}
+
+func collectSteps(legs []osrmLeg) []any {
+	var out []any
+	for _, leg := range legs {
+		for _, step := range leg.Steps {
+			out = append(out, step)
+		}
+	}
+	return out
 }

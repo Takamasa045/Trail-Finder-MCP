@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"trail-finder-mcp/internal/config"
 	"trail-finder-mcp/internal/models"
 )
 
@@ -34,7 +35,7 @@ func openElevation(ctx context.Context, in models.ElevationInput) (*models.Eleva
 	endpoint := "https://api.open-elevation.com/api/v1/lookup?" + v.Encode()
 
 	req, _ := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-	req.Header.Set("User-Agent", "trail-finder-mcp/0.1")
+	req.Header.Set("User-Agent", config.UserAgent())
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func openTopo(ctx context.Context, in models.ElevationInput) (*models.ElevationR
 	endpoint := base + "?" + v.Encode()
 
 	req, _ := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-	req.Header.Set("User-Agent", "trail-finder-mcp/0.1")
+	req.Header.Set("User-Agent", config.UserAgent())
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err

@@ -2,7 +2,9 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"strings"
 )
 
 // ---- Common response ----
@@ -42,6 +44,15 @@ func (t *TrailheadsInput) Validate() error {
 	if t.Limit == 0 {
 		t.Limit = 200
 	}
+	for i, s := range t.Include {
+		v := strings.ToLower(strings.TrimSpace(s))
+		switch v {
+		case "guidepost", "trailhead":
+			t.Include[i] = v
+		default:
+			return fmt.Errorf("include supports guidepost or trailhead (got %q)", s)
+		}
+	}
 	return nil
 }
 
@@ -56,10 +67,10 @@ type POIItem struct {
 }
 
 type TrailheadsResponse struct {
-	Center  Coord    `json:"center"`
-	RadiusM int      `json:"radius_m"`
-	Items   []POIItem `json:"items"`
-	Attribution string `json:"attribution,omitempty"`
+	Center      Coord     `json:"center"`
+	RadiusM     int       `json:"radius_m"`
+	Items       []POIItem `json:"items"`
+	Attribution string    `json:"attribution,omitempty"`
 }
 
 type Coord struct {
@@ -83,6 +94,12 @@ func (in *RouteInput) Validate() error {
 	}
 	if in.Engine == "" {
 		in.Engine = "auto"
+	}
+	in.Engine = strings.ToLower(strings.TrimSpace(in.Engine))
+	switch in.Engine {
+	case "auto", "osrm", "valhalla":
+	default:
+		return fmt.Errorf("engine must be auto, osrm, or valhalla (got %q)", in.Engine)
 	}
 	return nil
 }

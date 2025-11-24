@@ -12,6 +12,7 @@ import (
 	"sort"
 	"time"
 
+	"trail-finder-mcp/internal/config"
 	"trail-finder-mcp/internal/models"
 )
 
@@ -61,7 +62,7 @@ func QueryPOIs(ctx context.Context, in models.TrailheadsInput) (*models.Trailhea
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-	req.Header.Set("User-Agent", "trail-finder-mcp/0.1 (+contact)")
+	req.Header.Set("User-Agent", config.UserAgent())
 
 	res, err := httpClient.Do(req)
 	if err != nil {
