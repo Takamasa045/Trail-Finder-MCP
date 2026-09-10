@@ -2,185 +2,140 @@
 
 [English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português](README.pt.md)
 
-**Version:** [v0.1.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.1.0)
+**Version:** 0.2.0 (English and Japanese are the canonical docs)
 
-Claude Code MCP server that aggregates open data for **trailheads / guideposts / water sources**, **walking routes**, **elevation**, and **weather**.
-Call it directly from Claude Code to fetch geo information useful for hiking and mountain trips.
+Claude / Codex MCP server that aggregates open data for **place names**, **trailheads / guideposts / huts / water**, **walking routes**, **elevation**, and **weather**.
+
+Call it from Claude Code, Claude Desktop, Codex, or Grok. For a full hiking plan from station or mountain names, use `plan_hike`.
 
 ---
 
-## 🚀 Quick Start
-
-### 1) Build the binary
-
-```bash
-cd /path/to/trail-finder-mcp
-go build -o trail-finder-mcp ./cmd/trail-finder-mcp
-```
+## Quick Start
 
 Requires **Go 1.23+**.
 
-### 2) Configure Claude Code MCP
+```bash
+git clone https://github.com/Takamasa045/Trail-Finder-MCP.git
+cd Trail-Finder-MCP
+go build -o trail-finder-mcp ./cmd/trail-finder-mcp
+```
 
-Add the following to `~/.config/claude-code/mcp_config.json`:
+Add the binary to your MCP client. Example (Claude Code / Claude Desktop / Grok-style JSON):
 
-```jsonc
+```json
 {
   "mcpServers": {
     "trail-finder": {
       "command": "/absolute/path/to/trail-finder-mcp",
       "env": {
-        "TRAILFINDER_OVERPASS_URL": "https://overpass-api.de/api/interpreter",
-        "OSRM_URL": "https://router.project-osrm.org",
-        "OPENMETEO_URL": "https://api.open-meteo.com/v1/forecast",
-        "DEFAULT_TZ": "Asia/Tokyo"
+        "DEFAULT_TZ": "Asia/Tokyo",
+        "DEFAULT_LANG": "ja",
+        "ELEVATION_PROVIDER": "open-meteo",
+        "TRAILFINDER_USER_AGENT": "trail-finder-mcp/0.2.0 (+https://github.com/Takamasa045/Trail-Finder-MCP)"
       }
     }
   }
 }
 ```
 
-- Set `command` to the absolute path of the built binary
-- Customize environment variables as needed (see below)
+Config file locations:
 
-### 3) Start Claude Code
+- **Claude Code**: `~/.claude.json` (`mcpServers`)
+- **Claude Desktop (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Codex**: `~/.codex/config.toml` under `[mcp_servers.trail-finder]`
 
-After saving the config, start Claude Code. The `trail-finder` MCP server loads automatically and exposes these tools:
+Optional HTTP JSON API (debug only, binds to 127.0.0.1):
+
+```bash
+./trail-finder-mcp -http :8080
+curl -s localhost:8080/healthz
+curl -s -X POST localhost:8080/tools/geocode -d '{"query":"高尾山口駅"}'
+```
+
+---
+
+## Tools
 
 | Tool | Description |
 |------|-------------|
-| `trailheads` | Search nearby trailheads / guideposts / water sources |
-| `route_foot` | Compute a walking route between two points |
-| `elevation` | Get elevation for a location |
-| `forecast` | Get a short-range weather forecast |
+| `geocode` | Place name → coordinates (Nominatim). Japanese names such as 高尾山口駅 work. |
+| `trailheads` | Nearby trailheads, guideposts, optional huts/passes/water (Overpass / OSM). |
+| `route_foot` | Walking route via OSRM, with geometry and elevation gain/loss when available. |
+| `elevation` | Elevation in meters (default: Open-Meteo). |
+| `forecast` | Hourly hiking forecast: temperature, rain, rain probability, wind **m/s**, gusts, weather code, sunrise/sunset. |
+| `plan_hike` | Combined plan: geocode from/to, route, POIs along the path, gain/loss, forecast at start and goal. Water is included unless `also_water` is false. |
 
----
+`engine=valhalla` is **not** implemented. Use `auto` or `osrm`.
 
-## 🛠️ Available Tools
+### `plan_hike` input
 
-### `trailheads`
-
-Search nearby trailheads, guideposts, water sources, and similar POIs.
-
-**Input:**
-- `lat`, `lon` — center coordinates
-- `radius_m` — search radius in meters
-- `include` — POI types to include (e.g. `["guidepost", "trailhead"]`)
-- `also_water` — whether to include water sources (`true` / `false`)
-- `limit` — max number of results
-
-**Output:**
-Nearby POIs as JSON (type, name, coordinates, etc.)
-
-### `route_foot`
-
-Compute the shortest walking route between two points.
-
-**Input:**
-- `from` — origin `{lat, lon}`
-- `to` — destination `{lat, lon}`
-- `engine` — routing engine (`"auto"`, `"osrm"`, `"valhalla"`)
-- `options` — extra options
-  - `include_geometry` (default: `true`) — include route geometry
-  - `include_steps` (default: `false`) — include OSRM step details
-  - `avoid_ferry` (default: `false`) — avoid ferries (OSRM `exclude=ferry`)
-
-**Output:**
-Distance, duration, and GeoJSON LineString geometry
-
-### `elevation`
-
-Get elevation for a point.
-
-**Input:**
-- `lat`, `lon` — coordinates
-
-**Output:**
-Elevation in meters
-
-### `forecast`
-
-Get a short-range weather forecast for a point.
-
-**Input:**
-- `lat`, `lon` — coordinates
-- `hours` — forecast horizon in hours
-
-**Output:**
-Time series of temperature, precipitation, and wind speed (Open-Meteo)
-
----
-
-## ⚙️ Environment Variables
-
-Set these in a `.env` file or in the MCP config `env` section:
-
-```bash
-TRAILFINDER_OVERPASS_URL=https://overpass-api.de/api/interpreter
-OSRM_URL=https://router.project-osrm.org
-VALHALLA_URL=                                      # set if you run your own Valhalla
-ELEVATION_PROVIDER=open-elevation                  # open-elevation | open-topo
-OPENMETEO_URL=https://api.open-meteo.com/v1/forecast
-DEFAULT_TZ=Asia/Tokyo
-TRAILFINDER_USER_AGENT=trail-finder-mcp/0.1.0 (+your-contact)
+```json
+{
+  "from": { "query": "高尾山口駅" },
+  "to": { "query": "高尾山" },
+  "also_water": true,
+  "hours": 24
+}
 ```
 
-See `.env.example` for a starter template.
+Coordinates also work: `{ "lat": 35.63, "lon": 139.27 }`. If both `query` and coordinates are set, `query` wins.
+
+`forecast` is for the start; `forecast_goal` is for the destination. Partial failures (POIs or weather) show up in `warnings` instead of failing the whole plan.
+
+### `trailheads` include values
+
+`guidepost`, `trailhead`, `shelter`, `pass`, `entrance` (opt-in; noisy). Default is guidepost + trailhead. Japan-oriented tags include `highway=trailhead` and `tourism=information` + `information=guidepost`. `entrance=yes` is **not** queried unless requested.
 
 ---
 
-## 📋 Example Prompts
+## Example prompts
 
-Ask Claude Code in natural language; it will pick the right tool:
-
-- “Find trailheads near Takao-sanguchi Station” → `trailheads`
-- “Route from Takao-sanguchi Station to the summit of Mt. Takao” → `route_foot`
-- “What is the elevation of Mt. Takao?” → `elevation`
-- “What’s the weather on Mt. Takao today?” → `forecast`
+- “高尾山口駅から高尾山までの計画を” → `plan_hike`
+- “高尾山口駅の座標は？” → `geocode`
+- “その周辺の登山口と水場” → `trailheads`
+- “高尾山の今日の風と降水確率” → `forecast`
 
 ---
 
-## 🖥️ Claude Desktop (optional)
+## Environment variables
 
-You can also use this server with Claude Desktop. Config file paths:
+See `.env.example`. Important ones:
 
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+| Variable | Default |
+|----------|---------|
+| `TRAILFINDER_OVERPASS_URL` | `https://overpass-api.de/api/interpreter` |
+| `OSRM_URL` | `https://router.project-osrm.org` |
+| `NOMINATIM_URL` | `https://nominatim.openstreetmap.org/search` |
+| `ELEVATION_PROVIDER` | `open-meteo` (`open-elevation`, `open-topo`, `off`) |
+| `OPENMETEO_URL` | `https://api.open-meteo.com/v1/forecast` |
+| `OPENMETEO_ELEVATION_URL` | `https://api.open-meteo.com/v1/elevation` |
+| `DEFAULT_TZ` | `Asia/Tokyo` |
+| `DEFAULT_LANG` | `ja` |
+| `TRAILFINDER_USER_AGENT` | identifies this client (required politeness for OSM) |
 
-The config content is the same as for Claude Code.
+Public Overpass / OSRM / Nominatim instances vary in load. For production, prefer self-hosted endpoints.
 
 ---
 
-## 📦 Releases
-
-Tagged releases are published on GitHub:
-
-- [Latest release](https://github.com/Takamasa045/Trail-Finder-MCP/releases/latest)
-- Current version: **v0.1.0**
+## Develop
 
 ```bash
-git clone https://github.com/Takamasa045/Trail-Finder-MCP.git
-cd Trail-Finder-MCP
-git checkout v0.1.0
-go build -o trail-finder-mcp ./cmd/trail-finder-mcp
+go test ./...
 ```
 
----
+HTTP retries (429/502/503/504, 2 extra attempts) and a short in-memory cache for Overpass / Nominatim are built in.
 
-## ⚠️ Notes
-
-- Public OSRM / Overpass APIs vary in load and latency. For production use, prefer self-hosted instances.
-- Returned data is for reference only. On the trail, prioritize local conditions and safety.
-- This tool does **not** guarantee hiking safety. Always plan and prepare properly.
+License: MIT. Spec notes: [docs/requirements.md](docs/requirements.md).
 
 ---
 
-## 📝 Data Sources & License
+## Notes
 
-External APIs and data sources used by this project:
+Returned data is for **reference only**. On the trail, prioritize local conditions, gear, and official notices. This tool does **not** guarantee hiking safety.
 
-- **OpenStreetMap / Overpass API** — map data (ODbL)
-- **OSRM** — routing engine
-- **Open-Meteo** — weather forecast data
-- **Open-Elevation / OpenTopoData** — elevation data
+## Data sources
+
+- OpenStreetMap / Overpass / Nominatim (ODbL)
+- OSRM
+- Open-Meteo (forecast + elevation)
+- Optional Open-Elevation / OpenTopoData

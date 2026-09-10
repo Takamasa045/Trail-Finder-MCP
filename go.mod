@@ -1,4 +1,4 @@
-module trail-finder-mcp
+module github.com/Takamasa045/Trail-Finder-MCP
 
 go 1.23.0
 

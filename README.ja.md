@@ -2,185 +2,114 @@
 
 [English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português](README.pt.md)
 
-**バージョン:** [v0.1.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.1.0)
+**バージョン:** 0.2.0（正本ドキュメントは英語と日本語です）
 
-オープンデータを横断して **登山口/道標/水場**・**徒歩ルート**・**標高**・**天気** を返す Claude Code 専用 MCP サーバーです。
-Claude Code から直接呼び出して、登山やハイキングに必要な地理情報を簡単に取得できます。
+オープンデータから **地名**・**登山口/道標/小屋/水場**・**徒歩ルート**・**標高**・**天気** を返す MCP サーバーです。
+
+Claude Code / Claude Desktop / Codex / Grok から使えます。駅名や山名から一括で計画するなら `plan_hike` を使ってください。
 
 ---
 
-## 🚀 Quick Start
-
-### 1) バイナリのビルド
-
-```bash
-cd /path/to/trail-finder-mcp
-go build -o trail-finder-mcp ./cmd/trail-finder-mcp
-```
+## Quick Start
 
 **Go 1.23+** が必要です。
 
-### 2) Claude Code の MCP 設定
+```bash
+git clone https://github.com/Takamasa045/Trail-Finder-MCP.git
+cd Trail-Finder-MCP
+go build -o trail-finder-mcp ./cmd/trail-finder-mcp
+```
 
-Claude Code の設定ファイル `~/.config/claude-code/mcp_config.json` に以下を追加します。
+MCP クライアントにバイナリを登録します。
 
-```jsonc
+```json
 {
   "mcpServers": {
     "trail-finder": {
       "command": "/absolute/path/to/trail-finder-mcp",
       "env": {
-        "TRAILFINDER_OVERPASS_URL": "https://overpass-api.de/api/interpreter",
-        "OSRM_URL": "https://router.project-osrm.org",
-        "OPENMETEO_URL": "https://api.open-meteo.com/v1/forecast",
-        "DEFAULT_TZ": "Asia/Tokyo"
+        "DEFAULT_TZ": "Asia/Tokyo",
+        "DEFAULT_LANG": "ja",
+        "ELEVATION_PROVIDER": "open-meteo",
+        "TRAILFINDER_USER_AGENT": "trail-finder-mcp/0.2.0 (+https://github.com/Takamasa045/Trail-Finder-MCP)"
       }
     }
   }
 }
 ```
 
-- `command` にはビルドしたバイナリの絶対パスを指定してください
-- 環境変数は必要に応じてカスタマイズできます（詳細は後述）
+設定ファイルの場所:
 
-### 3) Claude Code を起動
+- **Claude Code**: `~/.claude.json` の `mcpServers`
+- **Claude Desktop (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Codex**: `~/.codex/config.toml` の `[mcp_servers.trail-finder]`
 
-設定ファイルを保存後、Claude Code を起動すると「trail-finder」MCP サーバーが自動的に読み込まれ、以下のツールが利用可能になります:
+デバッグ用 HTTP:
+
+```bash
+./trail-finder-mcp -http :8080
+curl -s localhost:8080/healthz
+```
+
+---
+
+## ツール
 
 | ツール | 説明 |
 |--------|------|
-| `trailheads` | 周辺の登山口/道標/水場を検索 |
-| `route_foot` | 2 地点間の徒歩ルートを計算 |
-| `elevation` | 指定地点の標高を取得 |
-| `forecast` | 指定地点の天気予報を取得 |
+| `geocode` | 地名 → 座標（Nominatim）。「高尾山口駅」など日本語が使えます |
+| `trailheads` | 周辺の登山口・道標。小屋・峠・水場も可 |
+| `route_foot` | OSRM の徒歩ルート。形状と標高差を含みます |
+| `elevation` | 地点の標高（m）。デフォルトは Open-Meteo |
+| `forecast` | 気温・降水・降水確率・風速 **m/s**・突風・天気コード・日の出日の入り |
+| `plan_hike` | 地名または座標から、ルート・沿線 POI・標高差・短時間予報をまとめて返す |
 
----
+`engine=valhalla` は未実装です。`auto` または `osrm` を使ってください。
 
-## 🛠️ 利用可能なツール
+### `plan_hike` の入力例
 
-### `trailheads`
-
-周辺の登山口、道標、水場などを検索します。
-
-**入力パラメータ:**
-- `lat`, `lon` — 検索中心の緯度経度
-- `radius_m` — 検索半径（メートル）
-- `include` — 含める POI タイプの配列（例: `["guidepost", "trailhead"]`）
-- `also_water` — 水場も含めるか（`true` / `false`）
-- `limit` — 最大取得件数
-
-**出力:**
-近傍の POI を JSON で返却（タイプ、名称、座標など）
-
-### `route_foot`
-
-2 地点間の徒歩最短ルートを計算します。
-
-**入力パラメータ:**
-- `from` — 出発地点 `{lat, lon}`
-- `to` — 目的地点 `{lat, lon}`
-- `engine` — ルーティングエンジン（`"auto"`, `"osrm"`, `"valhalla"`）
-- `options` — 追加オプション
-  - `include_geometry`（デフォルト: `true`）ルート形状を含めるか
-  - `include_steps`（デフォルト: `false`）OSRM のステップ詳細を含めるか
-  - `avoid_ferry`（デフォルト: `false`）フェリーを避ける（OSRM の `exclude=ferry`）
-
-**出力:**
-距離、所要時間、GeoJSON LineString 形式のルート
-
-### `elevation`
-
-指定地点の標高を取得します。
-
-**入力パラメータ:**
-- `lat`, `lon` — 緯度経度
-
-**出力:**
-標高（メートル）
-
-### `forecast`
-
-指定地点の短時間天気予報を取得します。
-
-**入力パラメータ:**
-- `lat`, `lon` — 緯度経度
-- `hours` — 予報時間数
-
-**出力:**
-時系列の温度、降水量、風速データ（Open-Meteo）
-
----
-
-## ⚙️ 環境変数（カスタマイズ）
-
-`.env` ファイルまたは MCP 設定の `env` セクションで以下の環境変数を設定できます:
-
-```bash
-TRAILFINDER_OVERPASS_URL=https://overpass-api.de/api/interpreter
-OSRM_URL=https://router.project-osrm.org
-VALHALLA_URL=                                      # 自前の Valhalla を使う場合
-ELEVATION_PROVIDER=open-elevation                  # open-elevation | open-topo
-OPENMETEO_URL=https://api.open-meteo.com/v1/forecast
-DEFAULT_TZ=Asia/Tokyo
-TRAILFINDER_USER_AGENT=trail-finder-mcp/0.1.0 (+your-contact)
+```json
+{
+  "from": { "query": "高尾山口駅" },
+  "to": { "query": "高尾山" },
+  "also_water": true,
+  "hours": 24
+}
 ```
 
-テンプレートは `.env.example` を参照してください。
+座標でも渡せます: `{ "lat": 35.63, "lon": 139.27 }`。`query` と座標が両方あるときは `query` を使います。水場はデフォルトで含めます（`also_water: false` でオフ）。出発地予報は `forecast`、目的地は `forecast_goal` です。POI や天気が落ちてもルートは返し、`warnings` に理由を入れます。
+
+### `trailheads` の include
+
+`guidepost` / `trailhead` / `shelter` / `pass` / `entrance`（任意。ノイズが多いのでデフォルトでは使いません）。
+
+日本向けに `highway=trailhead` と道標タグを優先しています。
 
 ---
 
-## 📋 使用例
+## 使い方の例
 
-Claude Code で以下のように質問すると、自動的に適切なツールが呼び出されます:
-
-- 「高尾山口駅周辺の登山口を教えて」→ `trailheads`
-- 「高尾山口駅から高尾山山頂までのルートを調べて」→ `route_foot`
-- 「高尾山の標高は？」→ `elevation`
-- 「高尾山の今日の天気は？」→ `forecast`
+- 「高尾山口駅から高尾山までの計画を」→ `plan_hike`
+- 「高尾山口駅の座標は？」→ `geocode`
+- 「その周辺の登山口と水場」→ `trailheads`
+- 「高尾山の今日の風と降水確率」→ `forecast`
 
 ---
 
-## 🖥️ Claude Desktop での使用（オプション）
+## 環境変数
 
-Claude Desktop でも同様に使用できます。設定ファイルのパスは以下の通りです:
-
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
-
-設定内容は Claude Code と同じです。
+`.env.example` を参照してください。公開 Overpass / OSRM / Nominatim は混みやすいので、本格運用では自前エンドポイントを推奨します。
 
 ---
 
-## 📦 リリース
-
-GitHub でタグ付きリリースを公開しています:
-
-- [最新リリース](https://github.com/Takamasa045/Trail-Finder-MCP/releases/latest)
-- 現在のバージョン: **v0.1.0**
+## 開発
 
 ```bash
-git clone https://github.com/Takamasa045/Trail-Finder-MCP.git
-cd Trail-Finder-MCP
-git checkout v0.1.0
-go build -o trail-finder-mcp ./cmd/trail-finder-mcp
+go test ./...
 ```
 
----
+429/502/503/504 は最大 2 回リトライします。Overpass と Nominatim は短いメモリキャッシュがあります。
 
-## ⚠️ 注意事項
+ライセンスは MIT。要件メモは [docs/requirements.md](docs/requirements.md) です。
 
-- 公開 OSRM / Overpass API は負荷や速度が変動します。本格的な運用では自前インスタンスの利用を推奨します。
-- 返却される情報は参考データです。実際の登山やハイキングでは、現地の状況判断と安全配慮を最優先してください。
-- このツールは登山の安全を保証するものではありません。必ず事前の計画と準備を行ってください。
-
----
-
-## 📝 データソース・ライセンス
-
-このプロジェクトで使用している外部 API やデータソース:
-
-- **OpenStreetMap / Overpass API** — 地図データ（ODbL ライセンス）
-- **OSRM** — ルーティングエンジン
-- **Open-Meteo** — 天気予報データ
-- **Open-Elevation / OpenTopoData** — 標高データ
+返却データは参考情報です。現地の状況・装備・公式発表を優先してください。安全は保証しません。

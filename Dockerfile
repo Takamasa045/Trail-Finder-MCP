@@ -1,10 +1,11 @@
-FROM golang:1.22 as builder
+FROM golang:1.23-bookworm AS builder
 WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /trail-finder-mcp ./cmd/trail-finder-mcp
 
-FROM gcr.io/distroless/base-debian12
-ENV PORT=8080
+FROM gcr.io/distroless/static-debian12
 COPY --from=builder /trail-finder-mcp /trail-finder-mcp
-EXPOSE 8080
+USER nonroot:nonroot
 ENTRYPOINT ["/trail-finder-mcp"]

@@ -2,7 +2,9 @@
 
 [English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português](README.pt.md)
 
-**Version:** [v0.1.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.1.0)
+**Version:** [v0.2.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.2.0)
+> Ab **v0.2.0** sind [Englisch](README.md) und [Japanisch](README.ja.md) maßgeblich. Andere Übersetzungen können hinterherhinken.
+
 
 Claude-Code-MCP-Server, der Open Data zu **Wanderwegeinstiegen / Wegweisern / Wasserstellen**, **Fußrouten**, **Höhe** und **Wetter** bündelt.
 Direkt aus Claude Code aufrufbar, um Geoinformationen für Wandern und Bergtouren zu holen.

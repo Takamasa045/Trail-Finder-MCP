@@ -1,0 +1,19 @@
+{
+  "name": "trail-finder-mcp",
+  "version": "0.2.0",
+  "description": "MCP server for hiking: trailheads, walking routes, elevation, weather, geocoding, and combined hike plans.",
+  "author": "Takamasa045",
+  "license": "MIT",
+  "mcpServers": {
+    "trail-finder": {
+      "type": "stdio",
+      "command": ["go", "run", "./cmd/trail-finder-mcp"],
+      "env": {
+        "DEFAULT_TZ": "Asia/Tokyo",
+        "DEFAULT_LANG": "ja",
+        "ELEVATION_PROVIDER": "open-meteo",
+        "TRAILFINDER_USER_AGENT": "trail-finder-mcp/0.2.0 (+https://github.com/Takamasa045/Trail-Finder-MCP)"
+      }
+    }
+  }
+}

@@ -2,7 +2,9 @@
 
 [English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português](README.pt.md)
 
-**버전:** [v0.1.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.1.0)
+**버전:** [v0.2.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.2.0)
+> **v0.2.0**부터 기준 문서는 [영어](README.md)와 [일본어](README.ja.md)입니다. 다른 번역은 뒤처질 수 있습니다.
+
 
 **등산로 입구 / 이정표 / 급수원**, **도보 경로**, **고도**, **날씨** 등 오픈 데이터를 모아 제공하는 Claude Code 전용 MCP 서버입니다.
 Claude Code에서 바로 호출해 등산·하이킹에 필요한 지리 정보를 쉽게 얻을 수 있습니다.

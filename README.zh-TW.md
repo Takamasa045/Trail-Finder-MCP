@@ -2,7 +2,9 @@
 
 [English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português](README.pt.md)
 
-**版本:** [v0.1.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.1.0)
+**版本:** [v0.2.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.2.0)
+> 自 **v0.2.0** 起，以 [英文](README.md) 和 [日文](README.ja.md) 文件為準。其他語言可能較舊。
+
 
 面向 Claude Code 的 MCP 伺服器，彙整開放資料，提供 **登山口 / 路標 / 水源**、**步行路線**、**海拔** 與 **天氣** 資訊。
 可直接在 Claude Code 中呼叫，輕鬆取得健行與登山所需的地理資訊。

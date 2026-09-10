@@ -2,36 +2,37 @@ package router
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
-	"os"
 	"strconv"
-	"time"
+	"strings"
 
-	"trail-finder-mcp/internal/config"
-	"trail-finder-mcp/internal/models"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/config"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/elevation"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/geo"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/httpx"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/models"
 )
 
-var httpClient = &http.Client{Timeout: 20 * time.Second}
-
 func RouteFoot(ctx context.Context, in models.RouteInput) (*models.RouteResponse, error) {
-	engine := "osrm"
-	if in.Engine == "valhalla" && os.Getenv("VALHALLA_URL") != "" {
-		// TODO: implement valhalla client; fallback to OSRM for now
-		engine = "osrm"
-	} else if in.Engine == "osrm" || in.Engine == "auto" {
+	engine := strings.ToLower(strings.TrimSpace(in.Engine))
+	if engine == "" || engine == "auto" {
 		engine = "osrm"
 	}
-
-	switch engine {
-	case "osrm":
-		return routeOSRM(ctx, in)
-	default:
-		return nil, fmt.Errorf("engine not supported yet: %s", engine)
+	if engine == "valhalla" {
+		return nil, fmt.Errorf("valhalla is not implemented; use engine=osrm or auto")
 	}
+	if engine != "osrm" {
+		return nil, fmt.Errorf("engine not supported: %s", engine)
+	}
+	resp, err := routeOSRM(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	if optionBool(in.Options, "include_elevation", true) && len(resp.Geometry.Coordinates) >= 2 {
+		enrichElevation(ctx, resp)
+	}
+	return resp.WithMeta(), nil
 }
 
 type osrmResponse struct {
@@ -48,10 +49,7 @@ type osrmResponse struct {
 }
 
 func routeOSRM(ctx context.Context, in models.RouteInput) (*models.RouteResponse, error) {
-	base := os.Getenv("OSRM_URL")
-	if base == "" {
-		base = "https://router.project-osrm.org"
-	}
+	base := strings.TrimRight(config.Env("OSRM_URL", "https://router.project-osrm.org"), "/")
 
 	includeGeometry := optionBool(in.Options, "include_geometry", true)
 	includeSteps := optionBool(in.Options, "include_steps", false)
@@ -74,31 +72,14 @@ func routeOSRM(ctx context.Context, in models.RouteInput) (*models.RouteResponse
 	}
 	endpoint := fmt.Sprintf("%s/route/v1/foot/%s?%s", base, coords, q.Encode())
 
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", config.UserAgent())
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		b, _ := io.ReadAll(res.Body)
-		return nil, fmt.Errorf("osrm status=%d body=%s", res.StatusCode, string(b))
-	}
-
 	var out osrmResponse
-	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
-		return nil, err
+	if err := httpx.GetJSON(ctx, endpoint, &out); err != nil {
+		return nil, fmt.Errorf("osrm: %w", err)
 	}
 	if out.Code != "Ok" || len(out.Routes) == 0 {
 		return nil, fmt.Errorf("osrm route not found")
 	}
 	r := out.Routes[0]
-
 	resp := &models.RouteResponse{
 		Engine:    "osrm",
 		DistanceM: r.Distance,
@@ -114,6 +95,33 @@ func routeOSRM(ctx context.Context, in models.RouteInput) (*models.RouteResponse
 		resp.Steps = collectSteps(r.Legs)
 	}
 	return resp, nil
+}
+
+func enrichElevation(ctx context.Context, resp *models.RouteResponse) {
+	pts := geometryPoints(resp.Geometry.Coordinates)
+	if len(pts) < 2 {
+		return
+	}
+	samples := geo.SampleEvery(pts, 100, 40)
+	vals, _, err := elevation.LookupMany(ctx, samples)
+	if err != nil || len(vals) != len(samples) {
+		return
+	}
+	gain, loss := geo.ElevationGainLoss(vals)
+	resp.ElevationGainM = gain
+	resp.ElevationLossM = loss
+	resp.ElevationSampled = true
+}
+
+func geometryPoints(coords [][]float64) []geo.Point {
+	out := make([]geo.Point, 0, len(coords))
+	for _, c := range coords {
+		if len(c) < 2 {
+			continue
+		}
+		out = append(out, geo.Point{Lat: c[1], Lon: c[0]})
+	}
+	return out
 }
 
 func optionBool(options map[string]any, key string, defaultVal bool) bool {
@@ -148,6 +156,15 @@ func collectSteps(legs []osrmLeg) []any {
 		for _, step := range leg.Steps {
 			out = append(out, step)
 		}
+	}
+	return out
+}
+
+func GeometryCoords(resp models.RouteResponse) []models.Coord {
+	pts := geometryPoints(resp.Geometry.Coordinates)
+	out := make([]models.Coord, len(pts))
+	for i, p := range pts {
+		out[i] = models.Coord{Lat: p.Lat, Lon: p.Lon}
 	}
 	return out
 }

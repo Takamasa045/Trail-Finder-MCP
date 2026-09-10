@@ -1,16 +1,19 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 
-	"trail-finder-mcp/internal/elevation"
-	"trail-finder-mcp/internal/models"
-	"trail-finder-mcp/internal/overpass"
-	"trail-finder-mcp/internal/router"
-	"trail-finder-mcp/internal/weather"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/elevation"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/geocode"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/models"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/overpass"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/plan"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/router"
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/weather"
 )
 
 const maxRequestBodyBytes int64 = 1 << 20
@@ -19,13 +22,56 @@ func New() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
-	mux.HandleFunc("/tools/trailheads", handleTrailheads)
-	mux.HandleFunc("/tools/route_foot", handleRouteFoot)
-	mux.HandleFunc("/tools/elevation", handleElevation)
-	mux.HandleFunc("/tools/forecast", handleForecast)
+	mux.HandleFunc("/tools/trailheads", handleTool(func(ctx context.Context, in models.TrailheadsInput) (*models.TrailheadsResponse, error) {
+		return overpass.QueryPOIs(ctx, in)
+	}))
+	mux.HandleFunc("/tools/route_foot", handleTool(func(ctx context.Context, in models.RouteInput) (*models.RouteResponse, error) {
+		return router.RouteFoot(ctx, in)
+	}))
+	mux.HandleFunc("/tools/elevation", handleTool(func(ctx context.Context, in models.ElevationInput) (*models.ElevationResponse, error) {
+		return elevation.Lookup(ctx, in)
+	}))
+	mux.HandleFunc("/tools/forecast", handleTool(func(ctx context.Context, in models.ForecastInput) (*models.ForecastResponse, error) {
+		return weather.Forecast(ctx, in)
+	}))
+	mux.HandleFunc("/tools/geocode", handleTool(func(ctx context.Context, in models.GeocodeInput) (*models.GeocodeResponse, error) {
+		return geocode.Search(ctx, in)
+	}))
+	mux.HandleFunc("/tools/plan_hike", handleTool(func(ctx context.Context, in models.PlanHikeInput) (*models.PlanHikeResponse, error) {
+		return plan.Plan(ctx, in)
+	}))
 	return mux
+}
+
+func handleTool[In any, Out any](fn func(context.Context, In) (*Out, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		defer r.Body.Close()
+		var in In
+		if err := decodeJSONBody(r.Body, &in); err != nil {
+			badRequest(w, "invalid json: "+err.Error())
+			return
+		}
+		if v, ok := any(&in).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				badRequest(w, err.Error())
+				return
+			}
+		}
+		resp, err := fn(r.Context(), in)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, models.ErrorResponse{
+				Error: models.ErrorBody{Code: "UPSTREAM_ERROR", Message: err.Error(), Retryable: true},
+			})
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -64,104 +110,4 @@ func decodeJSONBody(body io.Reader, dst any) error {
 		return err
 	}
 	return nil
-}
-
-func handleTrailheads(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		methodNotAllowed(w, http.MethodPost)
-		return
-	}
-	defer r.Body.Close()
-	var in models.TrailheadsInput
-	if err := decodeJSONBody(r.Body, &in); err != nil {
-		badRequest(w, "invalid json: "+err.Error())
-		return
-	}
-	if err := in.Validate(); err != nil {
-		badRequest(w, err.Error())
-		return
-	}
-	resp, err := overpass.QueryPOIs(r.Context(), in)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, models.ErrorResponse{
-			Error: models.ErrorBody{Code: "UPSTREAM_ERROR", Message: err.Error(), Retryable: true},
-		})
-		return
-	}
-	writeJSON(w, http.StatusOK, resp)
-}
-
-func handleRouteFoot(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		methodNotAllowed(w, http.MethodPost)
-		return
-	}
-	defer r.Body.Close()
-	var in models.RouteInput
-	if err := decodeJSONBody(r.Body, &in); err != nil {
-		badRequest(w, "invalid json: "+err.Error())
-		return
-	}
-	if err := in.Validate(); err != nil {
-		badRequest(w, err.Error())
-		return
-	}
-	resp, err := router.RouteFoot(r.Context(), in)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, models.ErrorResponse{
-			Error: models.ErrorBody{Code: "UPSTREAM_ERROR", Message: err.Error(), Retryable: true},
-		})
-		return
-	}
-	writeJSON(w, http.StatusOK, resp)
-}
-
-func handleElevation(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		methodNotAllowed(w, http.MethodPost)
-		return
-	}
-	defer r.Body.Close()
-	var in models.ElevationInput
-	if err := decodeJSONBody(r.Body, &in); err != nil {
-		badRequest(w, "invalid json: "+err.Error())
-		return
-	}
-	if err := in.Validate(); err != nil {
-		badRequest(w, err.Error())
-		return
-	}
-	resp, err := elevation.Lookup(r.Context(), in)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, models.ErrorResponse{
-			Error: models.ErrorBody{Code: "UPSTREAM_ERROR", Message: err.Error(), Retryable: true},
-		})
-		return
-	}
-	writeJSON(w, http.StatusOK, resp)
-}
-
-func handleForecast(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		methodNotAllowed(w, http.MethodPost)
-		return
-	}
-	defer r.Body.Close()
-	var in models.ForecastInput
-	if err := decodeJSONBody(r.Body, &in); err != nil {
-		badRequest(w, "invalid json: "+err.Error())
-		return
-	}
-	if err := in.Validate(); err != nil {
-		badRequest(w, err.Error())
-		return
-	}
-	resp, err := weather.Forecast(r.Context(), in)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, models.ErrorResponse{
-			Error: models.ErrorBody{Code: "UPSTREAM_ERROR", Message: err.Error(), Retryable: true},
-		})
-		return
-	}
-	writeJSON(w, http.StatusOK, resp)
 }

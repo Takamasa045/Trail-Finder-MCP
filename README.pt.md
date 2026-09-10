@@ -2,7 +2,9 @@
 
 [English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português](README.pt.md)
 
-**Versão:** [v0.1.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.1.0)
+**Versão:** [v0.2.0](https://github.com/Takamasa045/Trail-Finder-MCP/releases/tag/v0.2.0)
+> A partir da **v0.2.0**, a documentação canônica é [inglês](README.md) e [japonês](README.ja.md). Outras traduções podem estar desatualizadas.
+
 
 Servidor MCP para Claude Code que agrega dados abertos de **acessos a trilhas / postes de sinalização / fontes de água**, **rotas a pé**, **elevação** e **clima**.
 Chame-o diretamente do Claude Code para obter informações geográficas úteis para caminhadas e montanhismo.
