@@ -43,7 +43,7 @@ func TestStdioMCPStartup(t *testing.T) {
 	}
 	defer session.Close()
 	result, err := session.ListTools(ctx, nil)
-	if err != nil || len(result.Tools) != 6 {
+	if err != nil || len(result.Tools) != 7 {
 		t.Fatalf("tools=%+v err=%v", result, err)
 	}
 	res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "geocode", Arguments: map[string]any{"query": " "}})

@@ -145,3 +145,30 @@ func TestGeometryCoords(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestRejectsSnappedEndpointsEvenWithoutOutputGeometry(t *testing.T) {
+	for _, tc := range []struct {
+		body      string
+		wantError bool
+	}{
+		{`{"code":"Ok","routes":[{"distance":50000,"duration":4000,"geometry":{"coordinates":[[138,36],[138,36.02]]}}]}`, true},
+		{`{"code":"Ok","waypoints":[{"location":[138,36]},{"location":[138,36.02]}],"routes":[{"geometry":{"coordinates":[[138,36],[138,36.001]]}}]}`, true},
+		{`{"code":"Ok","routes":[{"distance":100,"duration":80,"geometry":{"coordinates":[[138,36],[138,36.001]]}}]}`, false},
+	} {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Query().Get("overview") != "full" {
+				t.Error("must fetch geometry for validation")
+			}
+			_, _ = w.Write([]byte(tc.body))
+		}))
+		t.Setenv("OSRM_URL", ts.URL)
+		resp, err := RouteFoot(context.Background(), models.RouteInput{From: models.Coord{Lat: 36, Lon: 138}, To: models.Coord{Lat: 36.001, Lon: 138}, Options: map[string]any{"include_geometry": false, "include_elevation": false}})
+		ts.Close()
+		if (err != nil) != tc.wantError {
+			t.Fatalf("want error %v got %v", tc.wantError, err)
+		}
+		if err == nil && (len(resp.Geometry.Coordinates) != 0 || len(resp.Warnings) == 0) {
+			t.Fatalf("unexpected estimate response %+v", resp)
+		}
+	}
+}

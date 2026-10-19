@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/brief"
 	"github.com/Takamasa045/Trail-Finder-MCP/internal/config"
 	"github.com/Takamasa045/Trail-Finder-MCP/internal/elevation"
 	"github.com/Takamasa045/Trail-Finder-MCP/internal/geocode"
@@ -55,9 +56,14 @@ func NewServer() *mcp.Server {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "plan_hike",
-		Description: "Plan a hike from place names or coordinates: geocode, walking route, POIs along the route (trailheads/guideposts/huts/water), elevation gain/loss, and forecasts at start and goal. Water is included unless also_water=false. If both query and lat/lon are set, query wins.",
+		Description: "Plan a hike from place names or coordinates: geocode, walking route, POIs along the route (trailheads/guideposts/huts/water), elevation gain/loss, and forecasts at start and goal. Water is included unless also_water=false. Ambiguous place names are rejected; inspect geocode candidates and pass coordinates. If both query and lat/lon are set, query wins.",
 	}, handlePlanHike)
 
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "compare_hikes",
+		Description: "Compare 1..4 trailheads for any mountain in one call: caller-selected authority/operator source excerpts (distance, course time, ascent, difficulty), source publication/modification/retrieval dates, scoped foliage/access evidence and check links, summit/start forecast summaries with grid location/elevation, and endpoint-checked routing estimates. Supply official URLs discovered with your browser; this tool does not search the web or verify a trail is open/safe. Ambiguous names return candidates, never the first guess. Sources and weather survive routing failures; foliage/access current status remains unconfirmed.",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, handleCompareHikes)
 	return server
 }
 
@@ -198,4 +204,12 @@ func handlePlanHike(ctx context.Context, _ *mcp.CallToolRequest, args planArgs) 
 		return nil, models.PlanHikeResponse{}, errors.New("empty hike plan")
 	}
 	return nil, *resp, nil
+}
+
+func handleCompareHikes(ctx context.Context, _ *mcp.CallToolRequest, args brief.Input) (*mcp.CallToolResult, brief.Response, error) {
+	resp, err := brief.Compare(ctx, args)
+	if err != nil {
+		return nil, brief.Response{}, err
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: brief.Markdown(resp)}}}, *resp, nil
 }

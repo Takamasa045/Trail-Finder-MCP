@@ -102,3 +102,15 @@ func TestSearchCacheIsScopedToEndpoint(t *testing.T) {
 		}
 	}
 }
+
+func TestFirstRejectsAmbiguousCandidates(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[{"name":"Shared","lat":"35","lon":"139"},{"name":"Shared","lat":"36","lon":"138"}]`))
+	}))
+	defer ts.Close()
+	t.Setenv("NOMINATIM_URL", ts.URL)
+	t.Setenv("NOMINATIM_MIN_INTERVAL", "0")
+	if _, err := First(context.Background(), "Shared"); err == nil || !strings.Contains(err.Error(), "ambiguous") {
+		t.Fatalf("err=%v", err)
+	}
+}

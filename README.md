@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português](README.pt.md)
 
-**Version:** 0.2.1 (English and Japanese are the canonical docs)
+**Version:** 0.3.0 (English and Japanese are the canonical docs)
 
 Claude / Codex MCP server that aggregates open data for **place names**, **trailheads / guideposts / huts / water**, **walking routes**, **elevation**, and **weather**.
 
@@ -31,7 +31,7 @@ Add the binary to your MCP client. Example (Claude Code / Claude Desktop / Grok-
         "DEFAULT_TZ": "Asia/Tokyo",
         "DEFAULT_LANG": "ja",
         "ELEVATION_PROVIDER": "open-meteo",
-        "TRAILFINDER_USER_AGENT": "trail-finder-mcp/0.2.1 (+https://github.com/Takamasa045/Trail-Finder-MCP)"
+        "TRAILFINDER_USER_AGENT": "trail-finder-mcp/0.3.0 (+https://github.com/Takamasa045/Trail-Finder-MCP)"
       }
     }
   }
@@ -56,7 +56,7 @@ DEFAULT_LANG = "ja"
 ELEVATION_PROVIDER = "open-meteo"
 ```
 
-Replace `command` with the absolute path to the built binary. Restart the client and check that all six tools appear. Running the binary without arguments waits for MCP messages on stdin/stdout; it does not open a browser UI. `.env` files are not loaded automatically: set variables in the client's `env` configuration or your shell. The repository's `mcp.json` metadata assumes `go run` from the repository root; use the absolute binary path above when launching from another directory.
+Replace `command` with the absolute path to the built binary. Restart the client and check that all seven tools appear. Running the binary without arguments waits for MCP messages on stdin/stdout; it does not open a browser UI. `.env` files are not loaded automatically: set variables in the client's `env` configuration or your shell. The repository's `mcp.json` metadata assumes `go run` from the repository root; use the absolute binary path above when launching from another directory.
 
 Optional HTTP JSON API (debug only, binds to 127.0.0.1). This is not an MCP HTTP transport; configure MCP clients using stdio as above:
 
@@ -74,12 +74,15 @@ curl -s -X POST localhost:8080/tools/geocode -H 'Content-Type: application/json'
 |------|-------------|
 | `geocode` | Place name → coordinates (Nominatim). Japanese names such as 高尾山口駅 work. |
 | `trailheads` | Nearby trailheads, guideposts, optional huts/passes/water (Overpass / OSM). |
-| `route_foot` | Walking route via OSRM, with geometry and elevation gain/loss when available. |
+| `route_foot` | OSRM route estimate, with geometry and elevation gain/loss when available. Verify the server uses a pedestrian dataset. |
 | `elevation` | Elevation in meters (default: Open-Meteo). |
 | `forecast` | Hourly hiking forecast: temperature, rain, rain probability, wind **m/s**, gusts, weather code, sunrise/sunset. |
+| `compare_hikes` | Compare starts, forecast summaries and caller-selected official source excerpts with dates; preserve partial results. [Guide](docs/compare-hikes.md). |
 | `plan_hike` | Combined plan: geocode from/to, route, POIs along the path, gain/loss, forecast at start and goal. Water is included unless `also_water` is false. |
 
-`engine=valhalla` is **not** implemented. Use `auto` or `osrm`.
+`engine=valhalla` is **not** implemented. Use `auto` or `osrm`. OSRM results more than 100 m from a requested endpoint are rejected, including when geometry is omitted. A URL containing `/foot` does not verify the server's transport profile; its duration is not an official hiking course time.
+
+For research across several routes, use **`compare_hikes`**. It preserves source evidence and weather when routing fails. Supply authority/operator URLs found with your usual web search; it does not discover official pages itself. Old or undated pages do not confirm today's conditions: publication, modification and retrieval dates are kept separately. Foliage and access status remain **unconfirmed**, including when a recent notice is found. PDFs/images and official route totals are not automatically interpreted. See [inputs, examples and limits](docs/compare-hikes.md).
 
 ### `plan_hike` input
 
@@ -104,7 +107,7 @@ Coordinates also work: `{ "lat": 35.63, "lon": 139.27 }`. If both `query` and co
 
 ## Reading results and recovering from errors
 
-- For ambiguous place names, inspect `geocode` results (`display_name` and coordinates) and pass the selected coordinates to `plan_hike`. A name passed directly to `plan_hike` uses the first match.
+- For ambiguous place names, inspect `geocode` results (`display_name` and coordinates) and pass the selected coordinates to `plan_hike`. `plan_hike` rejects multiple geocoding candidates; select coordinates when a name is ambiguous.
 - `trailheads.items` are sorted by distance. An empty array means the search completed without matching mapped data; OSM coverage may be incomplete. Try a wider radius or different `include` values.
 - Overpass timeouts/runtime errors are reported as errors rather than empty results. Reduce the radius/corridor or retry later.
 - Empty or incomplete weather data is an error, never zero wind/rain. `plan_hike` keeps the route and adds separate start/goal forecast failures to `warnings`. Do not treat a forecast with a failure warning as available weather data.

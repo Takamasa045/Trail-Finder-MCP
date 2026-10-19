@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Read-only evaluations against the frozen fixtures in internal/brief,
+     internal/sources and internal/mcpserver tests; not a live conditions benchmark. -->
+<evaluation>
+  <qa_pair><question>Using the frozen two-location geocoder fixture, compare the starts without selecting coordinates, inspect location and routing results, and report the mountain status exactly.</question><answer>needs_selection</answer></qa_pair>
+  <qa_pair><question>In the frozen routing-failure fixture, compare both starts and inspect summit weather and each start forecast. Are forecast summaries retained despite unavailable routing? Return True or False.</question><answer>True</answer></qa_pair>
+  <qa_pair><question>Inspect the fixture article metadata and access evidence as of 2026-10-19. The publication is 2019-10-17 and modification is 2026-10-19. Which publication date must be used to assess age? Return YYYY-MM-DD.</question><answer>2019-10-17</answer></qa_pair>
+  <qa_pair><question>Attempt to compare the frozen coordinate routes while supplying a loopback source URL, then inspect whether data was fetched. Is the source request permitted? Return True or False.</question><answer>False</answer></qa_pair>
+  <qa_pair><question>Discover the workflow tool and inspect its annotations and description. Does compare_hikes declare read-only behavior while describing external data access? Return True or False.</question><answer>True</answer></qa_pair>
+  <qa_pair><question>For the weather fixture requested at latitude 35.6, compare requested and model coordinates and inspect the grid-elevation metadata. What model latitude was actually returned? Return a decimal number.</question><answer>35.5</answer></qa_pair>
+  <qa_pair><question>For the frozen rain-mountain route whose returned endpoint is 1657 m from the requested summit, compare the request and geometry and assess route acceptance. Can it be presented as an accepted hiking estimate? Return True or False.</question><answer>False</answer></qa_pair>
+  <qa_pair><question>With the frozen application/pdf source response, inspect retrieval status and follow-up links in a comparison. Does an unavailable PDF establish that there are no restrictions? Return True or False.</question><answer>False</answer></qa_pair>
+  <qa_pair><question>Inspect both terrain estimates and the point_elevation_difference_m field in the frozen two-start comparison. Is that field cumulative official ascent? Return True or False.</question><answer>False</answer></qa_pair>
+  <qa_pair><question>For metadata published at 2026-10-07T15:00:00Z, inspect raw time and the source date normalized to Asia/Tokyo, alongside the retrieval date. What publication calendar date should be displayed? Return YYYY-MM-DD.</question><answer>2026-10-08</answer></qa_pair>
+</evaluation>

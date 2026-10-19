@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -135,6 +136,21 @@ type RouteResponse struct {
 	ElevationLossM   float64           `json:"elevation_loss_m,omitempty"`
 	ElevationSampled bool              `json:"elevation_sampled,omitempty"`
 	Disclaimer       string            `json:"disclaimer,omitempty"`
+	Warnings         []string          `json:"warnings,omitempty"`
+}
+
+// encoding/json does not omit zero-valued structs with omitempty. Avoid emitting
+// an empty geometry with null coordinates, which violates the MCP output schema.
+func (r RouteResponse) MarshalJSON() ([]byte, error) {
+	type alias RouteResponse
+	var geometry *GeoJSONLineString
+	if len(r.Geometry.Coordinates) > 0 {
+		geometry = &r.Geometry
+	}
+	return json.Marshal(struct {
+		alias
+		Geometry *GeoJSONLineString `json:"geometry,omitempty"`
+	}{alias: alias(r), Geometry: geometry})
 }
 
 func (r *RouteResponse) WithMeta() *RouteResponse {
@@ -203,6 +219,13 @@ type HourlyForecast struct {
 }
 
 type ForecastResponse struct {
+	RequestedLocation Coord    `json:"requested_location"`
+	ModelLocation     *Coord   `json:"model_location,omitempty"`
+	ModelElevationM   *float64 `json:"model_elevation_m,omitempty"`
+	RetrievedAt       string   `json:"retrieved_at"`
+	SourceURL         string   `json:"source_url"`
+	ModelRunAt        string   `json:"model_run_at"`
+
 	Timezone    string           `json:"timezone"`
 	SunriseISO  string           `json:"sunrise,omitempty"`
 	SunsetISO   string           `json:"sunset,omitempty"`

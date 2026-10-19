@@ -129,7 +129,17 @@ func TestHandleCoreTools(t *testing.T) {
 func TestHandlePlanHike(t *testing.T) {
 	nominatim := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode([]map[string]any{{
-			"display_name": "A", "name": "A", "lat": "35", "lon": "139", "osm_type": "node", "osm_id": 1,
+			"display_name": "A", "name": "A", "lat": func() string {
+				if r.URL.Query().Get("q") == "goal-mcp" {
+					return "35.01"
+				}
+				return "35"
+			}(), "lon": func() string {
+				if r.URL.Query().Get("q") == "goal-mcp" {
+					return "139.01"
+				}
+				return "139"
+			}(), "osm_type": "node", "osm_id": 1,
 		}})
 	}))
 	defer nominatim.Close()

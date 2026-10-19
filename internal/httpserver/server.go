@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Takamasa045/Trail-Finder-MCP/internal/brief"
 	"github.com/Takamasa045/Trail-Finder-MCP/internal/elevation"
 	"github.com/Takamasa045/Trail-Finder-MCP/internal/geocode"
 	"github.com/Takamasa045/Trail-Finder-MCP/internal/models"
@@ -43,6 +44,7 @@ func New() *http.ServeMux {
 	mux.HandleFunc("/tools/plan_hike", handleTool(func(ctx context.Context, in models.PlanHikeInput) (*models.PlanHikeResponse, error) {
 		return plan.Plan(ctx, in)
 	}))
+	mux.HandleFunc("/tools/compare_hikes", handleTool(brief.Compare))
 	return mux
 }
 

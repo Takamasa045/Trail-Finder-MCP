@@ -136,7 +136,7 @@ func TestPlanHikeFromPlaceNames(t *testing.T) {
 	}
 }
 
-func TestPlanHikeNoGeometryFallsBackToEndpoints(t *testing.T) {
+func TestPlanHikeRejectsUnverifiableGeometry(t *testing.T) {
 	osrm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"code": "Ok",
@@ -167,15 +167,12 @@ func TestPlanHikeNoGeometryFallsBackToEndpoints(t *testing.T) {
 
 	fromLat, fromLon := 35.0, 139.0
 	toLat, toLon := 35.1, 139.1
-	resp, err := Plan(context.Background(), models.PlanHikeInput{
+	_, err := Plan(context.Background(), models.PlanHikeInput{
 		From: models.PlaceRef{Lat: &fromLat, Lon: &fromLon},
 		To:   models.PlaceRef{Lat: &toLat, Lon: &toLon},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.Route.DistanceM != 10 {
-		t.Fatalf("%+v", resp.Route)
+	if err == nil || !strings.Contains(err.Error(), "cannot verify route endpoints") {
+		t.Fatalf("expected unsafe geometry rejection, got %v", err)
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const DefaultVersion = "0.2.1"
+const DefaultVersion = "0.3.0"
 
 const Disclaimer = "参考情報です。現地の状況・装備・公式発表を優先してください。安全は保証しません。 / For reference only. Prioritize local conditions, gear, and official notices. This does not guarantee hiking safety."
 

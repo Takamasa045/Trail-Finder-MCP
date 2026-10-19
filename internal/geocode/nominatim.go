@@ -74,7 +74,7 @@ func Search(ctx context.Context, in models.GeocodeInput) (*models.GeocodeRespons
 	for _, row := range raw {
 		lat, err1 := strconv.ParseFloat(row.Lat, 64)
 		lon, err2 := strconv.ParseFloat(row.Lon, 64)
-		if err1 != nil || err2 != nil {
+		if err1 != nil || err2 != nil || (&models.ElevationInput{Lat: lat, Lon: lon}).Validate() != nil {
 			continue
 		}
 		resp.Items = append(resp.Items, models.GeocodeItem{
@@ -91,12 +91,15 @@ func Search(ctx context.Context, in models.GeocodeInput) (*models.GeocodeRespons
 }
 
 func First(ctx context.Context, query string) (models.GeocodeItem, error) {
-	resp, err := Search(ctx, models.GeocodeInput{Query: query, Limit: 1})
+	resp, err := Search(ctx, models.GeocodeInput{Query: query, Limit: 5})
 	if err != nil {
 		return models.GeocodeItem{}, err
 	}
 	if len(resp.Items) == 0 {
 		return models.GeocodeItem{}, fmt.Errorf("no geocode result for %q", query)
+	}
+	if len(resp.Items) > 1 {
+		return models.GeocodeItem{}, fmt.Errorf("ambiguous place %q: %d candidates; call geocode, inspect display_name, and pass selected coordinates", query, len(resp.Items))
 	}
 	return resp.Items[0], nil
 }

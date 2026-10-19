@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/Takamasa045/Trail-Finder-MCP/internal/config"
 	"github.com/Takamasa045/Trail-Finder-MCP/internal/httpx"
@@ -22,8 +23,11 @@ func Forecast(ctx context.Context, in models.ForecastInput) (*models.ForecastRes
 	q.Set("forecast_hours", fmt.Sprintf("%d", in.Hours))
 
 	var out struct {
-		Timezone string `json:"timezone"`
-		Hourly   struct {
+		Latitude  *float64 `json:"latitude"`
+		Longitude *float64 `json:"longitude"`
+		Elevation *float64 `json:"elevation"`
+		Timezone  string   `json:"timezone"`
+		Hourly    struct {
 			Time        []string   `json:"time"`
 			Temperature []*float64 `json:"temperature_2m"`
 			Precip      []*float64 `json:"precipitation"`
@@ -81,9 +85,15 @@ func Forecast(ctx context.Context, in models.ForecastInput) (*models.ForecastRes
 	}
 
 	resp := &models.ForecastResponse{
+		RequestedLocation: models.Coord{Lat: in.Lat, Lon: in.Lon},
+		RetrievedAt:       time.Now().UTC().Format(time.RFC3339), SourceURL: base,
+		ModelRunAt: "not supplied by upstream", ModelElevationM: out.Elevation,
 		Timezone:    out.Timezone,
 		Hourly:      make([]models.HourlyForecast, 0, n),
 		Attribution: "Open-Meteo.com",
+	}
+	if out.Latitude != nil && out.Longitude != nil {
+		resp.ModelLocation = &models.Coord{Lat: *out.Latitude, Lon: *out.Longitude}
 	}
 	if len(out.Daily.Sunrise) > 0 {
 		resp.SunriseISO = out.Daily.Sunrise[0]

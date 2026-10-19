@@ -32,7 +32,7 @@ func TestMCPToolDiscoveryAndCalls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 6 {
+	if len(tools.Tools) != 7 {
 		t.Fatalf("tools=%d", len(tools.Tools))
 	}
 	for _, tool := range tools.Tools {
@@ -97,5 +97,49 @@ func TestMCPToolDiscoveryAndCalls(t *testing.T) {
 	}
 	if text, ok := result.Content[0].(*mcp.TextContent); !ok || !strings.Contains(text.Text, "timed out") {
 		t.Fatalf("error message missing: %+v", result.Content)
+	}
+}
+
+func TestMCPComparisonWithAcceptedRouteAndNoGeometry(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/route/"):
+			_, _ = w.Write([]byte(`{"code":"Ok","routes":[{"distance":120,"duration":90,"geometry":{"type":"LineString","coordinates":[[139,35],[139,35.001]]}}]}`))
+		case r.URL.Path == "/elevation":
+			_, _ = w.Write([]byte(`{"elevation":[200]}`))
+		default:
+			_, _ = w.Write([]byte(`{"latitude":35,"longitude":139,"elevation":250,"timezone":"Asia/Tokyo","hourly":{"time":["2026-10-19T12:00"],"temperature_2m":[10],"precipitation":[0],"precipitation_probability":[20],"wind_speed_10m":[2],"wind_gusts_10m":[4],"weather_code":[3]}}`))
+		}
+	}))
+	defer up.Close()
+	t.Setenv("OSRM_URL", up.URL)
+	t.Setenv("OPENMETEO_ELEVATION_URL", up.URL+"/elevation")
+	t.Setenv("OPENMETEO_URL", up.URL+"/weather")
+	t.Setenv("ELEVATION_PROVIDER", "open-meteo")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	st, ct := mcp.NewInMemoryTransports()
+	ss, err := NewServer().Connect(ctx, st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+	for _, call := range []mcp.CallToolParams{
+		{Name: "route_foot", Arguments: map[string]any{"from": map[string]any{"lat": 35, "lon": 139}, "to": map[string]any{"lat": 35.001, "lon": 139}, "options": map[string]any{"include_geometry": false, "include_elevation": false}}},
+		{Name: "compare_hikes", Arguments: map[string]any{"subject": "Test mountain", "mountain": map[string]any{"lat": 35.001, "lon": 139}, "routes": []any{map[string]any{"name": "Test route", "start": map[string]any{"lat": 35, "lon": 139}}}, "hours": 1}},
+	} {
+		result, err := cs.CallTool(ctx, &call)
+		if err != nil || result.IsError || result.StructuredContent == nil {
+			t.Fatalf("%s: result=%+v error=%v", call.Name, result, err)
+		}
+		raw, _ := json.Marshal(result.StructuredContent)
+		if strings.Contains(string(raw), `"coordinates":null`) {
+			t.Fatalf("invalid geometry: %s", raw)
+		}
 	}
 }

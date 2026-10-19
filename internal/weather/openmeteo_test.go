@@ -16,7 +16,7 @@ func TestForecastRequestsMetersPerSecond(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rawQuery = r.URL.RawQuery
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"timezone": "Asia/Tokyo",
+			"timezone": "Asia/Tokyo", "latitude": 35.5, "longitude": 139.5, "elevation": 1234,
 			"hourly": map[string]any{
 				"time":                      []string{"2026-09-10T00:00", "2026-09-10T01:00"},
 				"temperature_2m":            []float64{12.5, 11.0},
@@ -49,6 +49,9 @@ func TestForecastRequestsMetersPerSecond(t *testing.T) {
 	}
 	if !strings.Contains(rawQuery, "precipitation_probability") {
 		t.Fatalf("missing precip probability in %s", rawQuery)
+	}
+	if resp.RequestedLocation.Lat != 35.6 || resp.ModelLocation == nil || resp.ModelLocation.Lat != 35.5 || resp.ModelElevationM == nil || *resp.ModelElevationM != 1234 || resp.RetrievedAt == "" || resp.ModelRunAt == "" {
+		t.Fatalf("missing forecast provenance: %+v", resp)
 	}
 	if resp.SunriseISO != "2026-09-10T05:30" || resp.SunsetISO != "2026-09-10T18:00" {
 		t.Fatalf("sun %+v", resp)
