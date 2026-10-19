@@ -62,46 +62,46 @@ func NewServer() *mcp.Server {
 }
 
 type trailheadsArgs struct {
-	Lat       float64  `json:"lat" description:"Latitude in decimal degrees"`
-	Lon       float64  `json:"lon" description:"Longitude in decimal degrees"`
-	RadiusM   int      `json:"radius_m,omitempty" description:"Search radius in meters (default 2000)"`
-	Include   []string `json:"include,omitempty" description:"OSM categories: guidepost, trailhead, shelter, pass, entrance"`
-	AlsoWater bool     `json:"also_water,omitempty" description:"Include drinking water and springs"`
-	Limit     int      `json:"limit,omitempty" description:"Maximum number of POIs to return"`
+	Lat       float64  `json:"lat" jsonschema:"Latitude in decimal degrees"`
+	Lon       float64  `json:"lon" jsonschema:"Longitude in decimal degrees"`
+	RadiusM   int      `json:"radius_m,omitempty" jsonschema:"Search radius in meters (default 2000)"`
+	Include   []string `json:"include,omitempty" jsonschema:"OSM categories: guidepost, trailhead, shelter, pass, entrance"`
+	AlsoWater bool     `json:"also_water,omitempty" jsonschema:"Include drinking water and springs"`
+	Limit     int      `json:"limit,omitempty" jsonschema:"Maximum number of POIs to return"`
 }
 
 type routeArgs struct {
-	From    models.Coord   `json:"from" description:"Starting location (lat/lon)"`
-	To      models.Coord   `json:"to" description:"Destination location (lat/lon)"`
-	Engine  string         `json:"engine,omitempty" description:"Routing engine (auto or osrm). valhalla is not implemented."`
-	Options map[string]any `json:"options,omitempty" description:"Optional flags: include_geometry, include_steps, avoid_ferry, include_elevation"`
+	From    models.Coord   `json:"from" jsonschema:"Starting location (lat/lon)"`
+	To      models.Coord   `json:"to" jsonschema:"Destination location (lat/lon)"`
+	Engine  string         `json:"engine,omitempty" jsonschema:"Routing engine (auto or osrm). valhalla is not implemented."`
+	Options map[string]any `json:"options,omitempty" jsonschema:"Optional flags: include_geometry, include_steps, avoid_ferry, include_elevation"`
 }
 
 type elevationArgs struct {
-	Lat float64 `json:"lat" description:"Latitude in decimal degrees"`
-	Lon float64 `json:"lon" description:"Longitude in decimal degrees"`
+	Lat float64 `json:"lat" jsonschema:"Latitude in decimal degrees"`
+	Lon float64 `json:"lon" jsonschema:"Longitude in decimal degrees"`
 }
 
 type forecastArgs struct {
-	Lat   float64 `json:"lat" description:"Latitude in decimal degrees"`
-	Lon   float64 `json:"lon" description:"Longitude in decimal degrees"`
-	Hours int     `json:"hours,omitempty" description:"Number of forecast hours (default 24, max 168)"`
+	Lat   float64 `json:"lat" jsonschema:"Latitude in decimal degrees"`
+	Lon   float64 `json:"lon" jsonschema:"Longitude in decimal degrees"`
+	Hours int     `json:"hours,omitempty" jsonschema:"Number of forecast hours (default 24, max 168)"`
 }
 
 type geocodeArgs struct {
-	Query        string `json:"query" description:"Place name to geocode"`
-	Limit        int    `json:"limit,omitempty" description:"Max results (default 5, max 10)"`
-	CountryCodes string `json:"country_codes,omitempty" description:"Optional Nominatim countrycodes, e.g. jp"`
+	Query        string `json:"query" jsonschema:"Place name to geocode"`
+	Limit        int    `json:"limit,omitempty" jsonschema:"Max results (default 5, max 10)"`
+	CountryCodes string `json:"country_codes,omitempty" jsonschema:"Optional Nominatim countrycodes, e.g. jp"`
 }
 
 type planArgs struct {
-	From      models.PlaceRef `json:"from" description:"Start: {query} or {lat,lon}"`
-	To        models.PlaceRef `json:"to" description:"Goal: {query} or {lat,lon}"`
-	AlsoWater *bool           `json:"also_water,omitempty" description:"Include water sources along the route (default true)"`
-	Include   []string        `json:"include,omitempty" description:"POI types along the route"`
-	Hours     int             `json:"hours,omitempty" description:"Forecast hours from the start (default 24)"`
-	CorridorM int             `json:"corridor_m,omitempty" description:"Search corridor around the route in meters (default 150)"`
-	Limit     int             `json:"limit,omitempty" description:"Max POIs along the route"`
+	From      models.PlaceRef `json:"from" jsonschema:"Start: {query} or {lat,lon}"`
+	To        models.PlaceRef `json:"to" jsonschema:"Goal: {query} or {lat,lon}"`
+	AlsoWater *bool           `json:"also_water,omitempty" jsonschema:"Include water sources along the route (default true)"`
+	Include   []string        `json:"include,omitempty" jsonschema:"POI types along the route"`
+	Hours     int             `json:"hours,omitempty" jsonschema:"Forecast hours from the start (default 24)"`
+	CorridorM int             `json:"corridor_m,omitempty" jsonschema:"Search corridor around the route in meters (default 150)"`
+	Limit     int             `json:"limit,omitempty" jsonschema:"Max POIs along the route"`
 }
 
 func handleTrailheads(ctx context.Context, _ *mcp.CallToolRequest, args trailheadsArgs) (*mcp.CallToolResult, models.TrailheadsResponse, error) {

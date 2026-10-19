@@ -28,7 +28,8 @@ var (
 )
 
 func Search(ctx context.Context, in models.GeocodeInput) (*models.GeocodeResponse, error) {
-	key := fmt.Sprintf("%s|%d|%s|%s", in.Query, in.Limit, in.CountryCodes, config.DefaultLang())
+	endpointURL := config.Env("NOMINATIM_URL", "https://nominatim.openstreetmap.org/search")
+	key := fmt.Sprintf("%s|%s|%d|%s|%s", endpointURL, in.Query, in.Limit, in.CountryCodes, config.DefaultLang())
 	var cached models.GeocodeResponse
 	if resultsCache.GetJSON(key, &cached) {
 		return cached.WithMeta(), nil
@@ -38,7 +39,7 @@ func Search(ctx context.Context, in models.GeocodeInput) (*models.GeocodeRespons
 		return nil, err
 	}
 
-	endpoint, err := url.Parse(config.Env("NOMINATIM_URL", "https://nominatim.openstreetmap.org/search"))
+	endpoint, err := url.Parse(endpointURL)
 	if err != nil {
 		return nil, err
 	}

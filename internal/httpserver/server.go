@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -98,7 +99,18 @@ func methodNotAllowed(w http.ResponseWriter, allowed string) {
 }
 
 func decodeJSONBody(body io.Reader, dst any) error {
-	dec := json.NewDecoder(io.LimitReader(body, maxRequestBodyBytes))
+	data, err := io.ReadAll(io.LimitReader(body, maxRequestBodyBytes+1))
+	if err != nil {
+		return err
+	}
+	if int64(len(data)) > maxRequestBodyBytes {
+		return errors.New("request body exceeds 1 MiB")
+	}
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || data[0] != '{' {
+		return errors.New("request body must contain a single JSON object")
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		return err

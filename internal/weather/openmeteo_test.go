@@ -60,3 +60,23 @@ func TestForecastRequestsMetersPerSecond(t *testing.T) {
 		t.Fatalf("hour1=%+v", resp.Hourly[1])
 	}
 }
+
+func TestForecastRejectsMissingData(t *testing.T) {
+	for _, tc := range []struct{ name, body string }{
+		{"empty", `{}`},
+		{"null code", `{"hourly":{"time":["t"],"temperature_2m":[0],"precipitation":[0],"precipitation_probability":[0],"wind_speed_10m":[0],"wind_gusts_10m":[0],"weather_code":[null]}}`},
+		{"empty time", `{"hourly":{"time":[null],"temperature_2m":[0],"precipitation":[0],"precipitation_probability":[0],"wind_speed_10m":[0],"wind_gusts_10m":[0],"weather_code":[0]}}`},
+		{"missing series", `{"hourly":{"time":["2026-10-19T08:00"]}}`},
+		{"null value", `{"hourly":{"time":["t"],"temperature_2m":[1],"precipitation":[0],"precipitation_probability":[0],"wind_speed_10m":[null],"wind_gusts_10m":[0],"weather_code":[0]}}`},
+		{"short series", `{"hourly":{"time":["t","u"],"temperature_2m":[1,2],"precipitation":[0,0],"precipitation_probability":[0,0],"wind_speed_10m":[1],"wind_gusts_10m":[0,0],"weather_code":[0,0]}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(tc.body)) }))
+			defer ts.Close()
+			t.Setenv("OPENMETEO_URL", ts.URL)
+			if _, err := Forecast(context.Background(), models.ForecastInput{Lat: 35, Lon: 139, Hours: 2}); err == nil {
+				t.Fatal("missing weather data must not be displayed as zero or success")
+			}
+		})
+	}
+}

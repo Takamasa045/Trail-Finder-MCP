@@ -87,3 +87,18 @@ func TestFirstEmpty(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestSearchCacheIsScopedToEndpoint(t *testing.T) {
+	t.Setenv("NOMINATIM_MIN_INTERVAL", "0")
+	for _, name := range []string{"first-provider", "second-provider"} {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = json.NewEncoder(w).Encode([]map[string]any{{"display_name": name, "lat": "35", "lon": "139"}})
+		}))
+		t.Setenv("NOMINATIM_URL", ts.URL)
+		resp, err := Search(context.Background(), models.GeocodeInput{Query: "same-query", Limit: 1})
+		ts.Close()
+		if err != nil || len(resp.Items) != 1 || resp.Items[0].DisplayName != name {
+			t.Fatalf("wrong provider response: resp=%+v err=%v", resp, err)
+		}
+	}
+}

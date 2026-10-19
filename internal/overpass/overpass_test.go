@@ -3,6 +3,7 @@ package overpass
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -146,5 +147,55 @@ func TestQueryPOIsWayCenter(t *testing.T) {
 	}
 	if resp.Items[0].Location.Lat != 35.7 || resp.Items[0].ID != "way/77" {
 		t.Fatalf("%+v", resp.Items[0])
+	}
+}
+
+// An Overpass timeout may arrive with HTTP 200 and partial elements.
+func TestQueryPOIsRejectsRemarkAndDoesNotCacheFailure(t *testing.T) {
+	calls := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			_, _ = w.Write([]byte(`{"remark":"runtime error: Query timed out", "elements":[{"type":"node","id":1,"lat":35,"lon":139,"tags":{"highway":"trailhead"}}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"elements":[]}`))
+	}))
+	defer ts.Close()
+	t.Setenv("TRAILFINDER_OVERPASS_URL", ts.URL)
+	in := models.TrailheadsInput{Lat: 35.1234, Lon: 139.5678, RadiusM: 500, Limit: 10}
+	if _, err := QueryPOIs(context.Background(), in); err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("expected Overpass runtime error, got %v", err)
+	}
+	resp, err := QueryPOIs(context.Background(), in)
+	if err != nil || len(resp.Items) != 0 || calls != 2 {
+		t.Fatalf("failure was cached: resp=%+v err=%v calls=%d", resp, err, calls)
+	}
+}
+
+func TestQueryPOIsCacheIsScopedToEndpoint(t *testing.T) {
+	in := models.TrailheadsInput{Lat: 35.111, Lon: 139.111, RadiusM: 700, Limit: 10}
+	for _, id := range []int{101, 202} {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = json.NewEncoder(w).Encode(map[string]any{"elements": []map[string]any{{"type": "node", "id": id, "lat": 35, "lon": 139, "tags": map[string]string{"highway": "trailhead"}}}})
+		}))
+		t.Setenv("TRAILFINDER_OVERPASS_URL", ts.URL)
+		resp, err := QueryPOIs(context.Background(), in)
+		ts.Close()
+		if err != nil || len(resp.Items) != 1 || resp.Items[0].ID != fmt.Sprintf("node/%d", id) {
+			t.Fatalf("wrong endpoint result: resp=%+v err=%v", resp, err)
+		}
+	}
+}
+
+func TestQueryPOIsRejectsMissingElements(t *testing.T) {
+	for _, body := range []string{`{}`, `{"elements":null}`} {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(body)) }))
+		t.Setenv("TRAILFINDER_OVERPASS_URL", ts.URL)
+		_, err := QueryPOIs(context.Background(), models.TrailheadsInput{Lat: 35, Lon: 139, RadiusM: 500})
+		ts.Close()
+		if err == nil {
+			t.Fatal("expected missing elements error")
+		}
 	}
 }

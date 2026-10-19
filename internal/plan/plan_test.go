@@ -274,3 +274,37 @@ func TestPlanHikeCoordsSkipGeocode(t *testing.T) {
 		t.Fatalf("sources %s %s", resp.From.Source, resp.To.Source)
 	}
 }
+
+func TestPlanReportsIncompleteUpstreamsAsWarnings(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/overpass":
+			_, _ = w.Write([]byte(`{"remark":"runtime error: Query timed out","elements":[]}`))
+		case "/forecast":
+			_, _ = w.Write([]byte(`{"hourly":{"time":["t"],"wind_speed_10m":[null]}}`))
+		default:
+			_, _ = w.Write([]byte(`{"code":"Ok","routes":[{"distance":100,"duration":60,"geometry":{"type":"LineString","coordinates":[[139,35],[139.001,35.001]]}}]}`))
+		}
+	}))
+	defer up.Close()
+	t.Setenv("OSRM_URL", up.URL)
+	t.Setenv("TRAILFINDER_OVERPASS_URL", up.URL+"/overpass")
+	t.Setenv("OPENMETEO_URL", up.URL+"/forecast")
+	t.Setenv("ELEVATION_PROVIDER", "off")
+	lat, lon, goalLat, goalLon := 35.0, 139.0, 35.001, 139.001
+	resp, err := Plan(context.Background(), models.PlanHikeInput{
+		From: models.PlaceRef{Lat: &lat, Lon: &lon}, To: models.PlaceRef{Lat: &goalLat, Lon: &goalLon}, Hours: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Route.DistanceM != 100 || len(resp.POIs) != 0 || len(resp.Forecast.Hourly) != 0 || len(resp.ForecastGoal.Hourly) != 0 {
+		t.Fatalf("partial plan=%+v", resp)
+	}
+	warnings := strings.Join(resp.Warnings, "\n")
+	for _, prefix := range []string{"POI search failed:", "start forecast failed:", "goal forecast failed:"} {
+		if !strings.Contains(warnings, prefix) {
+			t.Errorf("missing %s in %s", prefix, warnings)
+		}
+	}
+}

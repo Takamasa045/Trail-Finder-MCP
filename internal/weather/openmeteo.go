@@ -24,13 +24,13 @@ func Forecast(ctx context.Context, in models.ForecastInput) (*models.ForecastRes
 	var out struct {
 		Timezone string `json:"timezone"`
 		Hourly   struct {
-			Time        []string  `json:"time"`
-			Temperature []float64 `json:"temperature_2m"`
-			Precip      []float64 `json:"precipitation"`
-			PrecipProb  []float64 `json:"precipitation_probability"`
-			Wind        []float64 `json:"wind_speed_10m"`
-			Gust        []float64 `json:"wind_gusts_10m"`
-			Code        []int     `json:"weather_code"`
+			Time        []string   `json:"time"`
+			Temperature []*float64 `json:"temperature_2m"`
+			Precip      []*float64 `json:"precipitation"`
+			PrecipProb  []*float64 `json:"precipitation_probability"`
+			Wind        []*float64 `json:"wind_speed_10m"`
+			Gust        []*float64 `json:"wind_gusts_10m"`
+			Code        []*int     `json:"weather_code"`
 		} `json:"hourly"`
 		Daily struct {
 			Sunrise []string `json:"sunrise"`
@@ -50,6 +50,36 @@ func Forecast(ctx context.Context, in models.ForecastInput) (*models.ForecastRes
 		n = len(out.Hourly.Time)
 	}
 
+	if n == 0 {
+		return nil, fmt.Errorf("open-meteo: no hourly forecast data returned")
+	}
+	// A missing or null observation is unknown, not zero wind/rain.
+	for _, field := range []struct {
+		name   string
+		values []*float64
+	}{
+		{"temperature_2m", out.Hourly.Temperature}, {"precipitation", out.Hourly.Precip},
+		{"precipitation_probability", out.Hourly.PrecipProb}, {"wind_speed_10m", out.Hourly.Wind},
+		{"wind_gusts_10m", out.Hourly.Gust},
+	} {
+		if len(field.values) < n {
+			return nil, fmt.Errorf("open-meteo: incomplete hourly %s data", field.name)
+		}
+		for i := 0; i < n; i++ {
+			if field.values[i] == nil {
+				return nil, fmt.Errorf("open-meteo: missing hourly %s at %s", field.name, out.Hourly.Time[i])
+			}
+		}
+	}
+	if len(out.Hourly.Code) < n {
+		return nil, fmt.Errorf("open-meteo: incomplete hourly weather_code data")
+	}
+	for i := 0; i < n; i++ {
+		if out.Hourly.Code[i] == nil || out.Hourly.Time[i] == "" {
+			return nil, fmt.Errorf("open-meteo: missing hourly weather_code or time at index %d", i)
+		}
+	}
+
 	resp := &models.ForecastResponse{
 		Timezone:    out.Timezone,
 		Hourly:      make([]models.HourlyForecast, 0, n),
@@ -63,22 +93,13 @@ func Forecast(ctx context.Context, in models.ForecastInput) (*models.ForecastRes
 	}
 	for i := 0; i < n; i++ {
 		h := models.HourlyForecast{TimeISO: out.Hourly.Time[i]}
-		h.TemperatureC = at(out.Hourly.Temperature, i)
-		h.PrecipMM = at(out.Hourly.Precip, i)
-		h.PrecipProbabilityPct = at(out.Hourly.PrecipProb, i)
-		h.WindMps = at(out.Hourly.Wind, i)
-		h.WindGustMps = at(out.Hourly.Gust, i)
-		if i < len(out.Hourly.Code) {
-			h.WeatherCode = out.Hourly.Code[i]
-		}
+		h.TemperatureC = *out.Hourly.Temperature[i]
+		h.PrecipMM = *out.Hourly.Precip[i]
+		h.PrecipProbabilityPct = *out.Hourly.PrecipProb[i]
+		h.WindMps = *out.Hourly.Wind[i]
+		h.WindGustMps = *out.Hourly.Gust[i]
+		h.WeatherCode = *out.Hourly.Code[i]
 		resp.Hourly = append(resp.Hourly, h)
 	}
 	return resp.WithMeta(), nil
-}
-
-func at(vals []float64, i int) float64 {
-	if i < len(vals) {
-		return vals[i]
-	}
-	return 0
 }

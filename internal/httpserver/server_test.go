@@ -67,3 +67,35 @@ func TestGeocodeUpstream(t *testing.T) {
 		t.Fatalf("body=%s", rec.Body.String())
 	}
 }
+
+func TestDecodeJSONBodyRequiresOneBoundedObject(t *testing.T) {
+	for _, body := range []string{
+		`null`, `[]`, `"text"`, ``, `{} {}`, `{"unexpected":true}`,
+		`{"query":"x"}` + strings.Repeat(" ", int(maxRequestBodyBytes)),
+		strings.Repeat(" ", int(maxRequestBodyBytes)) + `null`,
+	} {
+		var in struct {
+			Query string `json:"query"`
+		}
+		if err := decodeJSONBody(strings.NewReader(body), &in); err == nil {
+			t.Fatalf("accepted invalid body (length %d)", len(body))
+		}
+	}
+	var in struct {
+		Query string `json:"query"`
+	}
+	body := `{"query":"x"}`
+	body += strings.Repeat(" ", int(maxRequestBodyBytes)-len(body))
+	if err := decodeJSONBody(strings.NewReader(body), &in); err != nil || in.Query != "x" {
+		t.Fatalf("valid boundary request: in=%+v err=%v", in, err)
+	}
+}
+
+func TestUnsupportedRouteEngineIsBadRequest(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/tools/route_foot", strings.NewReader(`{"from":{"lat":35,"lon":139},"to":{"lat":35.1,"lon":139.1},"engine":"valhalla"}`))
+	rec := httptest.NewRecorder()
+	New().ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), `"retryable":false`) {
+		t.Fatalf("code=%d body=%s", rec.Code, rec.Body.String())
+	}
+}

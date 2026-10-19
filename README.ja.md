@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português](README.pt.md)
 
-**バージョン:** 0.2.0（正本ドキュメントは英語と日本語です）
+**バージョン:** 0.2.1（正本ドキュメントは英語と日本語です）
 
 オープンデータから **地名**・**登山口/道標/小屋/水場**・**徒歩ルート**・**標高**・**天気** を返す MCP サーバーです。
 
@@ -31,7 +31,7 @@ MCP クライアントにバイナリを登録します。
         "DEFAULT_TZ": "Asia/Tokyo",
         "DEFAULT_LANG": "ja",
         "ELEVATION_PROVIDER": "open-meteo",
-        "TRAILFINDER_USER_AGENT": "trail-finder-mcp/0.2.0 (+https://github.com/Takamasa045/Trail-Finder-MCP)"
+        "TRAILFINDER_USER_AGENT": "trail-finder-mcp/0.2.1 (+https://github.com/Takamasa045/Trail-Finder-MCP)"
       }
     }
   }
@@ -44,11 +44,27 @@ MCP クライアントにバイナリを登録します。
 - **Claude Desktop (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Codex**: `~/.codex/config.toml` の `[mcp_servers.trail-finder]`
 
-デバッグ用 HTTP:
+Codex 用の TOML 設定例（上の JSON とは形式が異なります）:
+
+```toml
+[mcp_servers.trail-finder]
+command = "/absolute/path/to/trail-finder-mcp"
+
+[mcp_servers.trail-finder.env]
+DEFAULT_TZ = "Asia/Tokyo"
+DEFAULT_LANG = "ja"
+ELEVATION_PROVIDER = "open-meteo"
+```
+
+`command` はビルドした実行ファイルの絶対パスに置き換えてください。設定後はクライアントを再起動し、6 個のツールが表示されることを確認します。引数なしで実行すると MCP の標準入出力で待機します。ブラウザー用の画面は開きません。`.env` の自動読み込みはないため、環境変数はクライアント設定の `env` かシェルで指定してください。`mcp.json` はリポジトリ直下からの `go run` を想定したメタデータです。別の作業ディレクトリから使う場合は上の絶対パス設定を使ってください。
+
+デバッグ用 HTTP JSON API（MCP の HTTP トランスポートではありません。MCP クライアントには上の標準入出力設定を使います）:
 
 ```bash
 ./trail-finder-mcp -http :8080
 curl -s localhost:8080/healthz
+curl -s -X POST localhost:8080/tools/geocode \
+  -H 'Content-Type: application/json' -d '{"query":"高尾山口駅"}'
 ```
 
 ---
@@ -84,6 +100,16 @@ curl -s localhost:8080/healthz
 `guidepost` / `trailhead` / `shelter` / `pass` / `entrance`（任意。ノイズが多いのでデフォルトでは使いません）。
 
 日本向けに `highway=trailhead` と道標タグを優先しています。
+
+---
+
+## 検索結果とエラーの見方
+
+- 地名が曖昧なときは先に `geocode` の `display_name` と座標を確認し、選んだ座標を `plan_hike` に渡してください。地名を直接渡した場合は最初の候補を使います。
+- `trailheads.items` は近い順です。空の配列は検索が正常終了したうえで該当データがなかったことを意味します。OSM の未登録地点もあります。範囲を広げるか `include` を見直してください。
+- Overpass のタイムアウト・実行エラーは空の検索結果と区別します。半径・沿線範囲を小さくするか、時間を置いて再試行してください。
+- 天気の空データ・欠損値はエラーとして返します。欠損を風速 0・降水量 0 と表示しません。`plan_hike` はルートを維持し、出発地・目的地それぞれの予報エラーを `warnings` に入れます。警告のある予報を利用可能な予報として扱わないでください。
+- MCP の実行エラーは `isError: true` と説明文になります。入力形式のエラーはプロトコルエラーになる場合もあります。デバッグ用 HTTP では不正入力が 400、上流エラーが 502 です。POST 本文は単一 JSON オブジェクト、上限 1 MiB です。
 
 ---
 

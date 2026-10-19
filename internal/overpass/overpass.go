@@ -19,6 +19,7 @@ var resultsCache = cache.New(5*time.Minute, 64)
 
 type overpassResponse struct {
 	Elements []overpassElement `json:"elements"`
+	Remark   string            `json:"remark"`
 }
 
 type overpassElement struct {
@@ -156,17 +157,25 @@ func filterClauses(around string, include []string, alsoWater bool) []string {
 }
 
 func runQuery(ctx context.Context, query string) ([]models.POIItem, error) {
+	endpoint := config.Env("TRAILFINDER_OVERPASS_URL", "https://overpass-api.de/api/interpreter")
+	key := endpoint + "\n" + query
 	var cached []models.POIItem
-	if resultsCache.GetJSON(query, &cached) {
+	if resultsCache.GetJSON(key, &cached) {
 		return cached, nil
 	}
 
-	endpoint := config.Env("TRAILFINDER_OVERPASS_URL", "https://overpass-api.de/api/interpreter")
 	form := url.Values{}
 	form.Set("data", query)
 	var op overpassResponse
 	if err := httpx.PostFormJSON(ctx, endpoint, []byte(form.Encode()), &op); err != nil {
 		return nil, fmt.Errorf("overpass: %w", err)
+	}
+
+	if strings.TrimSpace(op.Remark) != "" {
+		return nil, fmt.Errorf("overpass: %s; try a smaller radius/corridor or retry later", op.Remark)
+	}
+	if op.Elements == nil {
+		return nil, fmt.Errorf("overpass: missing elements in response")
 	}
 
 	items := make([]models.POIItem, 0, len(op.Elements))
@@ -189,7 +198,7 @@ func runQuery(ctx context.Context, query string) ([]models.POIItem, error) {
 		}
 		items = append(items, p)
 	}
-	resultsCache.SetJSON(query, items)
+	resultsCache.SetJSON(key, items)
 	return items, nil
 }
 

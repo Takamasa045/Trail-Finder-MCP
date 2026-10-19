@@ -21,8 +21,8 @@ type ErrorResponse struct {
 }
 
 type Coord struct {
-	Lat float64 `json:"lat" description:"Latitude in decimal degrees"`
-	Lon float64 `json:"lon" description:"Longitude in decimal degrees"`
+	Lat float64 `json:"lat" jsonschema:"Latitude in decimal degrees"`
+	Lon float64 `json:"lon" jsonschema:"Longitude in decimal degrees"`
 }
 
 func validLatLon(lat, lon float64) bool {
@@ -111,9 +111,11 @@ func (in *RouteInput) Validate() error {
 	}
 	in.Engine = strings.ToLower(strings.TrimSpace(in.Engine))
 	switch in.Engine {
-	case "auto", "osrm", "valhalla":
+	case "auto", "osrm":
+	case "valhalla":
+		return errors.New("valhalla is not implemented; use engine=osrm or auto")
 	default:
-		return fmt.Errorf("engine must be auto, osrm, or valhalla (got %q)", in.Engine)
+		return fmt.Errorf("engine must be auto or osrm (got %q)", in.Engine)
 	}
 	return nil
 }
@@ -264,7 +266,7 @@ func (r *GeocodeResponse) WithMeta() *GeocodeResponse {
 // ---- Place / plan ----
 
 type PlaceRef struct {
-	Query string   `json:"query,omitempty" description:"Place name such as 高尾山口駅 or Mt. Takao"`
+	Query string   `json:"query,omitempty" jsonschema:"Place name such as 高尾山口駅 or Mt. Takao"`
 	Lat   *float64 `json:"lat,omitempty"`
 	Lon   *float64 `json:"lon,omitempty"`
 }
